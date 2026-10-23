@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Count & Flip">
+<link rel="icon" href="data:,">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
 <title>Count &amp; Flip</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -260,7 +261,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
   };
   const saved = store.get("cf-kid") || {};
-  const S = { max: saved.max || 100, voice: saved.voice || (saved.sound === false ? "off" : "phone"), round: saved.round || 5, letters: saved.letters || "both", words: saved.words || "short", music: saved.music !== false,
+  const S = { max: saved.max || 100, voice: (saved.voice === "phone" && !saved.v2) ? "kokoro" : (saved.voice || (saved.sound === false ? "off" : "kokoro")), round: saved.round || 5, letters: saved.letters || "both", words: saved.words || "short", music: saved.music !== false,
               screen:"home", act:null, deck:[], i:0, stars:0, busy:false, tries:0 };
   const app = document.getElementById("app");
 
@@ -354,7 +355,8 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
   "abcdefghijklmnopqrstuvwxyz".split("").forEach(l => CLIPS.push(["s_"+l, SOUNDTXT[l] + "  (the sound of " + l.toUpperCase() + ")"]));
   const clipGroup = id => /^n\d/.test(id) ? "Numbers" : id.startsWith("L_") ? "Letter names" : id.startsWith("s_") ? "Letter sounds" : READING_IDS.has(id) ? "Reading phrases" : "Game phrases";
   const numParts = n => n < 20 || n === 100 ? ["n"+n] : ["n" + (Math.floor(n/10)*10)].concat(n % 10 ? ["n" + (n % 10)] : []);
-  const voiceBufs = {};
+  const voiceBufs = {}, kBufs = {};
+  const bufFor = (id, userOnly) => (S.voice === "mine" || userOnly) && voiceBufs[id] ? voiceBufs[id] : (!userOnly && S.voice !== "phone" && S.voice !== "off" ? kBufs[id] : null) || null;
   let playing = [];
 
   const DB = {
@@ -393,9 +395,22 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     for(let c=0; c<buf.numberOfChannels; c++) out.getChannelData(c).set(buf.getChannelData(c).subarray(s0, s1 + 1));
     return out;
   }
-  function decode(arrayBuf){
+  function decode(arrayBuf, raw){
     const a = audio(); if(!a) return Promise.reject(new Error("no audio"));
-    return new Promise((res, rej) => a.decodeAudioData(arrayBuf.slice(0), b => res(trim(b)), rej));
+    return new Promise((res, rej) => a.decodeAudioData(arrayBuf.slice(0), b => res(raw ? b : trim(b)), rej));
+  }
+  async function loadKokoro(){
+    try{
+      const r = await fetch("voice/manifest.json"); if(!r.ok) return;
+      const man = await r.json(); let i = 0;
+      const worker = async () => {
+        while(i < man.length){
+          const id = man[i++];
+          try{ const f = await fetch("voice/" + id + ".mp3"); if(f.ok) kBufs[id] = await decode(await f.arrayBuffer(), true); }catch(e){}
+        }
+      };
+      await Promise.all([worker(), worker(), worker(), worker()]);
+    }catch(e){}
   }
   async function loadVoice(){
     try{
@@ -409,22 +424,21 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     playing.forEach(src => { try{ src.stop(); }catch(e){} }); playing = [];
     try{ window.speechSynthesis && speechSynthesis.cancel(); }catch(e){}
   }
-  function playParts(ids){
+  function playParts(ids, userOnly){
     const a = audio(); if(!a) return null;
     let t = a.currentTime + 0.05, last = null;
     ids.forEach(id => {
-      const src = a.createBufferSource(); src.buffer = voiceBufs[id]; src.connect(a.destination);
-      src.start(t); t += voiceBufs[id].duration + 0.05; playing.push(src); last = src;
+      const b = bufFor(id, userOnly); if(!b) return;
+      const src = a.createBufferSource(); src.buffer = b; src.connect(a.destination);
+      src.start(t); t += b.duration + 0.08; playing.push(src); last = src;
     });
     return last;
   }
-  function speak(parts, text, tail){
+  function speak(parts, text){
     if(!soundOn()) return;
     stopVoice();
-    if(S.voice === "mine" && parts && parts.length && parts.every(p => voiceBufs[p])){
-      const last = playParts(parts);
-      if(tail && last) last.onended = () => { if(playing.includes(last)) tts(tail); };
-    } else tts(text);
+    if(parts && parts.length && parts.every(p => bufFor(p))) playParts(parts);
+    else tts(text);
   }
 
   /* ---------- confetti ---------- */
@@ -537,6 +551,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     [["clock","🕐"],["sock","🧦"],["rock","🪨"]],
     [["ball","⚽"],["wall","🧱"]]
   ];
+  const wid = w => "w_" + w.replace(/ /g, "_");
   const READ_IDS = ["findletter","sound","firstletter","readword","rhyme","trace"];
   const WORD_EMOJI = {}; SHORT_WORDS.concat(LONG_WORDS).forEach(w => WORD_EMOJI[w[0]] = w[1]);
 
@@ -574,25 +589,25 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     if(act === "firstletter"){
       const t = pickOne(LETTER_IDS.filter(l => l !== "x")), T = t.toUpperCase(), w = LET[t][0], e = LET[t][1];
       return { key:"fi"+t+c, q:"What letter does " + w + " start with?", speech:"What letter does " + w + " start with?",
-        parts:["whatfirst"], tail:w, body:'<div class="pic-big">' + e + '</div><div class="pic-word">' + w + '</div>',
+        parts:[wid(w), "whatfirst"], body:'<div class="pic-big">' + e + '</div><div class="pic-word">' + w + '</div>',
         answer:t, choices: letterChoices(t, "x"), html: v => fmt(v, c), ansCls:" ltr",
-        winParts:["L_"+t], winTail:"is for " + w, win: T + " is for " + w + "!" };
+        winParts:["L_"+t, "isfor", wid(w)], win: T + " is for " + w + "!" };
     }
     if(act === "readword"){
       const pool = wordPool(), w = pickOne(pool), others = shuffle(pool.filter(x => x[0] !== w[0] && x[1] !== w[1] && x[0][0] !== w[0][0])).slice(0,2);
       return { key:"rw"+w[0], q:"Read the word", speech:"Read the word. Which picture is it?", parts:["readword"], word:w[0],
         answer:w[0], choices: shuffle([w[0]].concat(others.map(x => x[0]))), html: v => '<span class="pa">' + WORD_EMOJI[v] + '</span>', ansCls:" pic",
-        help:true, helpText:w[0], winParts:[], winTail:w[0], win: w[0] + "!" };
+        help:true, helpText:w[0], winParts:[wid(w[0])], win: w[0] + "!" };
     }
     if(act === "rhyme"){
       const sets = shuffle(RHYMES.slice()), s1 = sets[0], pair = shuffle(s1.slice()), t = pair[0], a = pair[1];
       const d = sets.slice(1, 3).map(s => pickOne(s));
       const all = shuffle([a, d[0], d[1]]);
-      return { key:"ry"+t[0]+a[0], q:"Which one rhymes with " + t[0] + "?", speech:"Which one rhymes with " + t[0] + "?", parts:["rhymeswith"], tail:t[0],
+      return { key:"ry"+t[0]+a[0], q:"Which one rhymes with " + t[0] + "?", speech:"Which one rhymes with " + t[0] + "?", parts:["rhymeswith", wid(t[0])],
         body:'<div class="pic-big">' + t[1] + '</div><div class="pic-word">' + t[0] + '</div>',
         answer:a[0], choices: all.map(x => x[0]),
         html: v => { const f = all.find(x => x[0] === v); return '<span class="pa">' + f[1] + '</span><span class="pw">' + v + '</span>'; }, ansCls:" pic",
-        winParts:[], winTail: t[0] + " and " + a[0] + " rhyme", win: t[0] + " and " + a[0] + " rhyme!" };
+        winParts:[wid(t[0]), "and", wid(a[0]), "rhyme"], win: t[0] + " and " + a[0] + " rhyme!" };
     }
     const t = pickOne(LETTER_IDS), T = t.toUpperCase();
     return { key:"tr"+t+c, trace:true, ch: fmt(t, c), q:"Trace the letter", speech:"Trace the letter " + T, parts:["traceit", "L_"+t],
@@ -669,7 +684,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
       '<div class="cheer" id="cheer" aria-live="polite"></div>';
     document.getElementById("homeBtn").addEventListener("click", () => { stopVoice(); home(); });
     bindMusicBtn();
-    const say = () => speak(c.parts, c.speech, c.tail);
+    const say = () => speak(c.parts, c.speech);
     const sp = document.getElementById("speakBtn"); if(sp) sp.addEventListener("click", say);
     const lb = document.getElementById("listenBtn"); if(lb) lb.addEventListener("click", say);
     app.querySelectorAll(".lt").forEach(b => b.addEventListener("click", () => {
@@ -683,15 +698,15 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
   function celebrate(c){
     S.busy = true;
     const cheer = document.getElementById("cheer");
-    const recorded = PRAISE.map((x,k) => k).filter(k => voiceBufs["p"+k]);
-    const pk = S.voice === "mine" && recorded.length ? pickOne(recorded) : rand(0, PRAISE.length - 1), p = PRAISE[pk];
+    const recorded = PRAISE.map((x,k) => k).filter(k => bufFor("p"+k));
+    const pk = recorded.length ? pickOne(recorded) : rand(0, PRAISE.length - 1), p = PRAISE[pk];
     cheer.className = "cheer"; cheer.textContent = p + " " + c.win;
     chime(); confetti();
     const wp = c.winParts || numParts(c.winNum);
-    setTimeout(() => speak(["p"+pk].concat(wp), p + " " + (c.winText || c.win), c.winTail), 350);
+    setTimeout(() => speak(["p"+pk].concat(wp), p + " " + (c.winText || c.win)), 350);
     S.stars++;
     const st = document.getElementById("st-" + (S.stars-1)); if(st) st.classList.add("on");
-    setTimeout(next, c.winTail || c.trace ? 2800 : 2000);
+    setTimeout(next, (c.trace || (c.winParts && c.winParts.length > 2)) ? 2800 : 2000);
   }
 
   function answer(btn){
@@ -707,7 +722,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
       btn.classList.add("nope"); btn.disabled = true;
       cheer.className = "cheer again"; cheer.textContent = "Oops! Try again.";
       boop(); setTimeout(() => speak(["oops"], "Oops! Try again."), 300);
-      if(c.help && S.tries >= 2 && soundOn()) setTimeout(() => { if(!S.busy && S.deck[S.i] === c) { stopVoice(); tts(c.helpText); } }, 1700);
+      if(c.help && S.tries >= 2 && soundOn()) setTimeout(() => { if(!S.busy && S.deck[S.i] === c) { speak([wid(c.helpText)], c.helpText); } }, 1700);
     }
   }
 
@@ -821,7 +836,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
       const l = b.dataset.l, L = l.toUpperCase(), w = LET[l][0], snd = SOUNDTXT[l];
       app.querySelectorAll(".abc button.hit").forEach(x => x.classList.remove("hit")); b.classList.add("hit");
       document.getElementById("abcSay").innerHTML = '<span class="bl">' + L + l + '</span><span class="bw">' + L + ' is for ' + w + ' ' + LET[l][1] + '<small>says "' + snd + '"</small></span>';
-      speak(["L_" + l, "s_" + l], L + ". " + snd + ". " + L + " is for " + w + ".", L + " is for " + w);
+      speak(["L_" + l, "s_" + l, "L_" + l, "isfor", wid(w)], L + ". " + snd + ". " + L + " is for " + w + ".");
     }));
   }
 
@@ -836,10 +851,10 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
       seg("letters", [["both","Aa both"],["caps","ABC"],["small","abc"]], "Letters") +
       seg("words", [["short","Short (cat)"],["long","Longer (frog)"],["mixed","Mixed"]], "Reading words") +
       seg("round", [[5,"5 cards"],[10,"10 cards"]], "Game length") +
-      seg("voice", [["mine","My voice"],["phone","Phone voice"],["off","Off"]], "Voice") +
+      seg("voice", [["kokoro","Kokoro voice"],["mine","My voice"],["phone","Phone voice"],["off","Off"]], "Voice") +
       seg("music", [[true,"Music on"],[false,"Music off"]], "Background music") +
       '<button type="button" class="big-btn rec-open" id="recOpen">🎙 Record my voice</button>' +
-      '<p class="note">Turn the iPhone\'s silent switch off to hear the voice and music. Above 20, numbers show as purple ten-sticks and yellow single blocks. Letter sounds need your recordings to sound right: the phone voice only guesses them.</p>' +
+      '<p class="note">Turn the iPhone\'s silent switch off to hear the voice and music. Above 20, numbers show as purple ten-sticks and yellow single blocks. "My voice" uses your recordings and fills any gaps with the Kokoro voice. The Phone voice only guesses letter sounds.</p>' +
       '<button type="button" class="big-btn" id="closePanel">Done</button></div>';
     document.body.appendChild(sheet);
     sheet.addEventListener("click", e => { if(e.target === sheet) sheet.remove(); });
@@ -853,7 +868,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     document.getElementById("closePanel").addEventListener("click", () => sheet.remove());
     document.getElementById("recOpen").addEventListener("click", () => { sheet.remove(); recorder(); });
   }
-  function saveSettings(){ store.set("cf-kid", {max:S.max, voice:S.voice, round:S.round, letters:S.letters, words:S.words, music:S.music}); }
+  function saveSettings(){ store.set("cf-kid", {v2:1, max:S.max, voice:S.voice, round:S.round, letters:S.letters, words:S.words, music:S.music}); }
 
   /* ---------- voice recorder ---------- */
   let micStream = null, mediaRec = null, recTimer = 0;
@@ -884,7 +899,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
       document.getElementById("recPrev").addEventListener("click", () => { if(!recording){ idx--; draw(); } });
       document.getElementById("recNext").addEventListener("click", () => { if(!recording){ idx++; draw(); } });
       document.getElementById("micBtn").addEventListener("click", toggle);
-      document.getElementById("recPlay").addEventListener("click", () => { const b = voiceBufs[CLIPS[idx][0]]; if(b){ stopVoice(); playParts([CLIPS[idx][0]]); } });
+      document.getElementById("recPlay").addEventListener("click", () => { const b = voiceBufs[CLIPS[idx][0]]; if(b){ stopVoice(); playParts([CLIPS[idx][0]], true); } });
       document.getElementById("recWipe").addEventListener("click", wipe);
       app.querySelectorAll(".chip").forEach(ch => ch.addEventListener("click", () => { if(!recording){ idx = +ch.dataset.k; draw(); } }));
     }
@@ -913,8 +928,8 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
           if(decoded.duration < 0.15){ draw("That was too quiet. Tap the red button and try again a little louder.", "err"); return; }
           voiceBufs[id] = decoded;
           await DB.put(id, {buf, type: blob.type});
-          if(S.voice === "phone"){ S.voice = "mine"; saveSettings(); }
-          stopVoice(); playParts([id]);
+          if(S.voice !== "mine" && S.voice !== "off"){ S.voice = "mine"; saveSettings(); }
+          stopVoice(); playParts([id], true);
           draw("✓ Saved. Listen, then tap Next →", "ok");
         }catch(e){ draw("That recording didn't save. Tap the red button to try again.", "err"); }
       };
@@ -927,7 +942,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
       if(!confirmWipe){ confirmWipe = true; draw(); return; }
       try{ await DB.clear(); }catch(e){}
       Object.keys(voiceBufs).forEach(k => delete voiceBufs[k]);
-      if(S.voice === "mine"){ S.voice = "phone"; saveSettings(); }
+      if(S.voice === "mine"){ S.voice = "kokoro"; saveSettings(); }
       confirmWipe = false; idx = 0; draw("All recordings deleted.", "ok");
     }
     function leave(){
@@ -943,8 +958,24 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     if(/^[1-3]$/.test(e.key)){ const b = document.getElementById("ans-" + (+e.key-1)); if(b) b.click(); }
   });
 
+  window.cfManifest = () => {
+    const out = {}, LN = {a:"ay",b:"bee",c:"cee",d:"dee",e:"ee",f:"eff",g:"gee",h:"aitch",i:"eye",j:"jay",k:"kay",l:"ell",m:"em",n:"en",o:"oh",p:"pee",q:"cue",r:"are",s:"ess",t:"tee",u:"you",v:"vee",w:"double you",x:"ex",y:"why",z:"zee"};
+    CLIPS.forEach(c => {
+      const id = c[0];
+      if(/^n\d+$/.test(id)) out[id] = {t: words(+id.slice(1))};
+      else if(id.startsWith("L_")) out[id] = {t: LN[id.slice(2)]};
+      else if(id.startsWith("s_")) out[id] = {sound: id.slice(2)};
+      else out[id] = {t: c[1]};
+    });
+    out.isfor = {t:"is for"}; out.rhyme = {t:"rhyme"};
+    LETTER_IDS.forEach(l => { out[wid(LET[l][0])] = {t: LET[l][0].replace("-", " ")}; });
+    SHORT_WORDS.concat(LONG_WORDS).concat([].concat.apply([], RHYMES)).forEach(w => { out[wid(w[0])] = {t: w[0]}; });
+    return out;
+  };
+  window.cfDebug = () => ({kokoro:Object.keys(kBufs).length, mine:Object.keys(voiceBufs).length, voice:S.voice});
   document.addEventListener("visibilitychange", () => { if(document.hidden) musicStop(); else applyMusic(); });
   loadVoice();
+  loadKokoro();
   home();
 })();
 </script>
