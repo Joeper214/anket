@@ -145,6 +145,28 @@ button:focus-visible{outline:4px solid var(--grape); outline-offset:3px}
 .seg{display:flex; gap:8px; flex-wrap:wrap}
 .seg button{border:3px solid var(--ink-soft); background:var(--cloud); border-radius:14px; padding:8px 16px 5px; font-size:1.1rem; font-weight:700; color:var(--ink)}
 .seg button[aria-pressed="true"]{border-color:var(--ink); background:var(--sun); box-shadow:0 3px 0 var(--ink)}
+.rec{display:flex; flex-direction:column; gap:14px}
+.rec .card{gap:6px}
+.rec .say-lbl{font-size:.85rem; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); font-weight:700}
+.rec .say{font-size:clamp(2rem, 9vw, 2.8rem); font-weight:800; line-height:1.1; text-wrap:balance; min-height:2.4em; display:flex; align-items:center; justify-content:center}
+.rec .state{font-size:1rem; font-weight:700; color:var(--ink-soft); min-height:1.4em}
+.rec .state.ok{color:var(--grass-deep)} .rec .state.err{color:var(--berry-deep)}
+.rec-row{display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap}
+.mic{width:96px; height:96px; border-radius:50%; border:4px solid var(--ink); background:var(--berry); box-shadow:0 6px 0 var(--ink); display:grid; place-items:center; padding:0}
+.mic span{width:34px; height:34px; border-radius:50%; background:var(--cloud); display:block}
+.mic.on{background:var(--berry-deep); animation:pulse 1s ease infinite}
+.mic.on span{border-radius:6px}
+.mic:active{transform:translateY(4px); box-shadow:0 2px 0 var(--ink)}
+.small-btn{border:3px solid var(--ink); border-radius:16px; background:var(--cloud); padding:10px 16px 6px; font-size:1.1rem; font-weight:800; box-shadow:0 4px 0 var(--ink)}
+.small-btn:disabled{opacity:.35; cursor:default}
+.small-btn:active:not(:disabled){transform:translateY(3px); box-shadow:0 1px 0 var(--ink)}
+.chips{display:flex; flex-wrap:wrap; gap:6px}
+.chip{border:2px solid var(--ink-soft); background:rgba(255,255,255,.75); border-radius:10px; padding:4px 9px 1px; font-size:.95rem; font-weight:700; color:var(--ink)}
+.chip.done{background:#c9f2d8; border-color:var(--grass-deep)}
+.chip.cur{border-color:var(--ink); box-shadow:0 0 0 2px var(--ink)}
+.rec .note{font-size:.95rem; color:var(--ink); margin:0; line-height:1.4; background:rgba(255,255,255,.7); border-radius:14px; padding:10px 12px}
+.panel .rec-open{background:var(--berry); color:var(--cloud)}
+@keyframes pulse{0%,100%{box-shadow:0 6px 0 var(--ink), 0 0 0 0 rgba(255,107,139,.6)}50%{box-shadow:0 6px 0 var(--ink), 0 0 0 14px rgba(255,107,139,0)}}
 .panel .note{font-size:.9rem; color:var(--ink-soft); margin:0; line-height:1.4}
 
 canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:30}
@@ -187,25 +209,30 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
   };
   const saved = store.get("cf-kid") || {};
-  const S = { max: saved.max || 100, sound: saved.sound !== false, round: saved.round || 5,
+  const S = { max: saved.max || 100, voice: saved.voice || (saved.sound === false ? "off" : "phone"), round: saved.round || 5,
               screen:"home", act:null, deck:[], i:0, stars:0, busy:false, tries:0 };
   const app = document.getElementById("app");
 
   /* ---------- sound ---------- */
+  const soundOn = () => S.voice !== "off";
   let actx = null;
+  function audio(){
+    if(!actx){ try{ actx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){ return null; } }
+    if(actx.state === "suspended"){ try{ actx.resume(); }catch(e){} }
+    return actx;
+  }
   function tone(freq, start, dur, type){
     try{
-      if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
-      const t = actx.currentTime + start, o = actx.createOscillator(), g = actx.createGain();
+      const a = audio(); if(!a) return;
+      const t = a.currentTime + start, o = a.createOscillator(), g = a.createGain();
       o.type = type || "sine"; o.frequency.value = freq;
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t+0.02); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
-      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+dur+0.05);
+      o.connect(g); g.connect(a.destination); o.start(t); o.stop(t+dur+0.05);
     }catch(e){}
   }
-  const chime = () => { if(!S.sound) return; tone(660,0,.18); tone(880,.12,.22); tone(1175,.26,.35); };
-  const boop = () => { if(!S.sound) return; tone(300,0,.2,"triangle"); tone(240,.12,.25,"triangle"); };
-  function say(text){
-    if(!S.sound) return;
+  const chime = () => { if(!soundOn()) return; tone(660,0,.18); tone(880,.12,.22); tone(1175,.26,.35); };
+  const boop = () => { if(!soundOn()) return; tone(300,0,.2,"triangle"); tone(240,.12,.25,"triangle"); };
+  function tts(text){
     try{
       const sy = window.speechSynthesis; if(!sy) return;
       sy.cancel();
@@ -213,6 +240,87 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
       u.rate = 0.85; u.pitch = 1.15; u.lang = "en-US";
       sy.speak(u);
     }catch(e){}
+  }
+
+  /* ---------- recorded voice ---------- */
+  const CLIPS = [
+    ["howmany","How many are there?"], ["counttens","Count the tens, then the ones."], ["findnum","Find the number"],
+    ["and","and"], ["more","more"], ["altogether","How many altogether?"], ["whichmore","Which group has more?"],
+    ["p0","Yes!"], ["p1","Great job!"], ["p2","You got it!"], ["p3","Super!"], ["p4","Awesome!"], ["p5","Well done!"],
+    ["oops","Oops! Try again."], ["youdidit","You did it!"]
+  ];
+  for(let n=0; n<20; n++) CLIPS.push(["n"+n, String(n) + "  (" + ONES[n] + ")"]);
+  for(let n=20; n<=90; n+=10) CLIPS.push(["n"+n, String(n) + "  (" + TENS[n/10] + ")"]);
+  CLIPS.push(["n100", "100  (one hundred)"]);
+  const numParts = n => n < 20 || n === 100 ? ["n"+n] : ["n" + (Math.floor(n/10)*10)].concat(n % 10 ? ["n" + (n % 10)] : []);
+  const voiceBufs = {};
+  let playing = [];
+
+  const DB = {
+    db: null,
+    open(){
+      if(DB.db) return Promise.resolve(DB.db);
+      return new Promise((res, rej) => {
+        try{
+          const r = indexedDB.open("cf-voice", 1);
+          r.onupgradeneeded = () => r.result.createObjectStore("clips");
+          r.onsuccess = () => { DB.db = r.result; res(r.result); };
+          r.onerror = () => rej(r.error);
+        }catch(e){ rej(e); }
+      });
+    },
+    req(mode, fn){
+      return DB.open().then(db => new Promise((res, rej) => {
+        const st = db.transaction("clips", mode).objectStore("clips"), r = fn(st);
+        r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+      }));
+    },
+    put(k, v){ return DB.req("readwrite", st => st.put(v, k)); },
+    clear(){ return DB.req("readwrite", st => st.clear()); },
+    keys(){ return DB.req("readonly", st => st.getAllKeys()); },
+    get(k){ return DB.req("readonly", st => st.get(k)); }
+  };
+
+  function trim(buf){
+    const a = audio(), d = buf.getChannelData(0), th = 0.02, pad = Math.floor(buf.sampleRate * 0.04);
+    let s0 = 0, s1 = d.length - 1;
+    while(s0 < d.length && Math.abs(d[s0]) < th) s0++;
+    while(s1 > s0 && Math.abs(d[s1]) < th) s1--;
+    if(s1 <= s0) return buf;
+    s0 = Math.max(0, s0 - pad); s1 = Math.min(d.length - 1, s1 + pad);
+    const out = a.createBuffer(buf.numberOfChannels, s1 - s0 + 1, buf.sampleRate);
+    for(let c=0; c<buf.numberOfChannels; c++) out.getChannelData(c).set(buf.getChannelData(c).subarray(s0, s1 + 1));
+    return out;
+  }
+  function decode(arrayBuf){
+    const a = audio(); if(!a) return Promise.reject(new Error("no audio"));
+    return new Promise((res, rej) => a.decodeAudioData(arrayBuf.slice(0), b => res(trim(b)), rej));
+  }
+  async function loadVoice(){
+    try{
+      const keys = await DB.keys();
+      for(const k of keys){
+        try{ const v = await DB.get(k); voiceBufs[k] = await decode(v.buf); }catch(e){}
+      }
+    }catch(e){}
+  }
+  function stopVoice(){
+    playing.forEach(src => { try{ src.stop(); }catch(e){} }); playing = [];
+    try{ window.speechSynthesis && speechSynthesis.cancel(); }catch(e){}
+  }
+  function playParts(ids){
+    const a = audio(); if(!a) return;
+    let t = a.currentTime + 0.05;
+    ids.forEach(id => {
+      const src = a.createBufferSource(); src.buffer = voiceBufs[id]; src.connect(a.destination);
+      src.start(t); t += voiceBufs[id].duration + 0.05; playing.push(src);
+    });
+  }
+  function speak(parts, text){
+    if(!soundOn()) return;
+    stopVoice();
+    if(S.voice === "mine" && parts && parts.length && parts.every(p => voiceBufs[p])) playParts(parts);
+    else tts(text);
   }
 
   /* ---------- confetti ---------- */
@@ -267,23 +375,23 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     if(act === "count"){
       const n = rand(1, max);
       if(n > 20){
-        return { key:"c"+n, q:"How many blocks?", speech:"How many blocks? Count the tens, then the ones.", body: blocks(n), answer:n, choices: near(n,1,max), win: tensOnes(n) + " make " + n + "!" };
+        return { key:"c"+n, q:"How many blocks?", speech:"How many blocks? Count the tens, then the ones.", parts:["howmany","counttens"], winNum:n, body: blocks(n), answer:n, choices: near(n,1,max), win: tensOnes(n) + " make " + n + "!" };
       }
-      return { key:"c"+n, q:"How many " + name + "?", speech:"How many " + name + "?", body: objs(e, n, sizeFor(n)), answer:n, choices: near(n,1,max), win: n + "!" };
+      return { key:"c"+n, q:"How many " + name + "?", speech:"How many " + name + "?", parts:["howmany"], winNum:n, body: objs(e, n, sizeFor(n)), answer:n, choices: near(n,1,max), win: n + "!" };
     }
     if(act === "listen"){
       const n = rand(1, max);
-      return { key:"l"+n, q:"Find the number", speech:"Find the number " + n, listen:true, n, answer:n, choices: near(n,1,max), win: n + "!" };
+      return { key:"l"+n, q:"Find the number", speech:"Find the number " + n, parts:["findnum"].concat(numParts(n)), winNum:n, listen:true, n, answer:n, choices: near(n,1,max), win: n + "!" };
     }
     if(act === "add" && max > 20){
       const a = rand(10, max - 1), b = rand(1, Math.min(9, max - a)), r = a + b;
-      return { key:"a"+a+"_"+b, q:"How many altogether?", speech: a + ", and " + b + " more. How many altogether?",
+      return { key:"a"+a+"_"+b, q:"How many altogether?", speech: a + ", and " + b + " more. How many altogether?", parts: numParts(a).concat(["and"], numParts(b), ["more","altogether"]), winNum:r,
                body:'<div class="sum"><div class="bignum">' + a + '</div><span class="plus">+</span>' + objs(e,b,"clamp(1.7rem, 8vw, 2.4rem)") + '</div>',
                answer:r, choices: near(r,1,max), win: a + " and " + b + " make " + r + "!" };
     }
     if(act === "add"){
       const top = Math.min(max, 10), a = rand(1, top-1), b = rand(1, top - a), r = a + b, sz = sizeFor(Math.max(a,b)) ;
-      return { key:"a"+a+"_"+b, q:"How many altogether?", speech: a + " " + name + ", and " + b + " more. How many altogether?",
+      return { key:"a"+a+"_"+b, q:"How many altogether?", speech: a + " " + name + ", and " + b + " more. How many altogether?", parts: numParts(a).concat(["and"], numParts(b), ["more","altogether"]), winNum:r,
                body:'<div class="sum">' + objs(e,a,"clamp(1.7rem, 8vw, 2.4rem)") + '<span class="plus">+</span>' + objs(e,b,"clamp(1.7rem, 8vw, 2.4rem)") + '</div>',
                answer:r, choices: near(r,1,top), win: a + " and " + b + " make " + r + "!" };
     }
@@ -291,7 +399,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     const e2 = pickOne(THINGS.filter(t => t[0] !== e));
     const groups = shuffle([{n:a, e}, {n:b, e:e2[0]}]);
     const big = Math.max(a,b), winner = groups.findIndex(g => g.n === big);
-    return { key:"m"+Math.min(a,b)+"_"+big, q:"Which has more?", speech:"Which group has more?", groups, answer:winner, win: big + " is more!" };
+    return { key:"m"+Math.min(a,b)+"_"+big, q:"Which has more?", speech:"Which group has more?", parts:["whichmore"], winNum:big, groups, answer:winner, win: big + " is more!" };
   }
 
   function deck(act){
@@ -328,7 +436,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     const c = S.deck[S.i];
     let body = c.body || "";
     if(c.listen){
-      body = S.sound ? '<button type="button" class="listen-big" id="listenBtn" aria-label="Hear the number again">🔊</button>'
+      body = soundOn() ? '<button type="button" class="listen-big" id="listenBtn" aria-label="Hear the number again">🔊</button>'
                      : '<div class="word">' + words(c.n) + '</div>';
     }
     let answers;
@@ -341,14 +449,14 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     }
     app.innerHTML =
       '<div class="bar"><button type="button" class="round-btn" id="homeBtn" aria-label="Home">🏠</button>' + starsHTML() + '<span style="width:52px;flex:none"></span></div>' +
-      '<div class="card"><div class="q"><span>' + c.q + '</span>' + (S.sound ? '<button type="button" class="speak" id="speakBtn" aria-label="Say it again">🔊</button>' : '') + '</div>' + body + '</div>' +
+      '<div class="card"><div class="q"><span>' + c.q + '</span>' + (soundOn() ? '<button type="button" class="speak" id="speakBtn" aria-label="Say it again">🔊</button>' : '') + '</div>' + body + '</div>' +
       answers +
       '<div class="cheer" id="cheer" aria-live="polite"></div>';
-    document.getElementById("homeBtn").addEventListener("click", () => { try{ speechSynthesis.cancel(); }catch(e){} home(); });
-    const sp = document.getElementById("speakBtn"); if(sp) sp.addEventListener("click", () => say(c.speech));
-    const lb = document.getElementById("listenBtn"); if(lb) lb.addEventListener("click", () => say(c.speech));
+    document.getElementById("homeBtn").addEventListener("click", () => { stopVoice(); home(); });
+    const sp = document.getElementById("speakBtn"); if(sp) sp.addEventListener("click", () => speak(c.parts, c.speech));
+    const lb = document.getElementById("listenBtn"); if(lb) lb.addEventListener("click", () => speak(c.parts, c.speech));
     app.querySelectorAll(".ans").forEach(b => b.addEventListener("click", () => answer(b)));
-    setTimeout(() => say(c.speech), 250);
+    setTimeout(() => speak(c.parts, c.speech), 250);
   }
 
   function answer(btn){
@@ -359,9 +467,11 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
       S.busy = true;
       btn.classList.add("yay");
       app.querySelectorAll(".ans").forEach(b => { if(b !== btn) b.disabled = true; });
-      const p = pickOne(PRAISE);
+      const recorded = PRAISE.map((x,k) => k).filter(k => voiceBufs["p"+k]);
+      const pk = S.voice === "mine" && recorded.length ? pickOne(recorded) : rand(0, PRAISE.length - 1), p = PRAISE[pk];
       cheer.className = "cheer"; cheer.textContent = p + " " + c.win;
-      chime(); confetti(); say(p + " " + c.win);
+      chime(); confetti();
+      setTimeout(() => speak(["p"+pk].concat(numParts(c.winNum)), p + " " + c.win), 350);
       S.stars++;
       const st = document.getElementById("st-" + (S.stars-1)); if(st) st.classList.add("on");
       setTimeout(next, 2000);
@@ -369,7 +479,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
       S.tries++;
       btn.classList.add("nope"); btn.disabled = true;
       cheer.className = "cheer again"; cheer.textContent = "Oops! Try again.";
-      boop(); say("Oops! Try again.");
+      boop(); setTimeout(() => speak(["oops"], "Oops! Try again."), 300);
     }
   }
 
@@ -386,7 +496,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
       '<p style="margin:0;font-size:1.2rem;font-weight:700;color:var(--ink-soft)">' + total + ' stars collected so far</p>' +
       '<button type="button" class="big-btn" id="againBtn">Play again</button>' +
       '<button type="button" class="big-btn alt" id="homeBtn2">🏠 Home</button></div>';
-    confetti(); chime(); say("You did it! You got " + S.stars + " stars!");
+    confetti(); chime(); setTimeout(() => speak(["youdidit"], "You did it! You got " + S.stars + " stars!"), 400);
     document.getElementById("againBtn").addEventListener("click", () => start(S.act));
     document.getElementById("homeBtn2").addEventListener("click", home);
   }
@@ -400,18 +510,104 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     sheet.innerHTML = '<div class="panel" role="dialog" aria-label="Settings for grown-ups"><h3>Settings for grown-ups</h3>' +
       seg("max", [[5,"Up to 5"],[10,"Up to 10"],[20,"Up to 20"],[50,"Up to 50"],[100,"Up to 100"]], "Numbers") +
       seg("round", [[5,"5 cards"],[10,"10 cards"]], "Game length") +
-      seg("sound", [[true,"Voice on"],[false,"Voice off"]], "Sound") +
+      seg("voice", [["mine","My voice"],["phone","Phone voice"],["off","Off"]], "Voice") +
+      '<button type="button" class="big-btn rec-open" id="recOpen">🎙 Record my voice</button>' +
       '<p class="note">Turn the iPhone\'s silent switch off to hear the voice. Above 20, numbers show as purple ten-sticks and yellow single blocks. Big adding games start from a number and add a few more.</p>' +
       '<button type="button" class="big-btn" id="closePanel">Done</button></div>';
     document.body.appendChild(sheet);
     sheet.addEventListener("click", e => { if(e.target === sheet) sheet.remove(); });
     sheet.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
       const k = b.dataset.k; let v = b.dataset.v;
-      S[k] = k === "sound" ? v === "true" : +v;
-      store.set("cf-kid", {max:S.max, sound:S.sound, round:S.round});
+      S[k] = k === "voice" ? v : +v;
+      saveSettings();
       sheet.querySelectorAll('.seg button[data-k="' + k + '"]').forEach(x => x.setAttribute("aria-pressed", x === b));
     }));
     document.getElementById("closePanel").addEventListener("click", () => sheet.remove());
+    document.getElementById("recOpen").addEventListener("click", () => { sheet.remove(); recorder(); });
+  }
+  function saveSettings(){ store.set("cf-kid", {max:S.max, voice:S.voice, round:S.round}); }
+
+  /* ---------- voice recorder ---------- */
+  let micStream = null, mediaRec = null, recTimer = 0;
+  function recorder(startAt){
+    S.screen = "rec";
+    let idx = startAt != null ? startAt : Math.max(0, CLIPS.findIndex(c => !voiceBufs[c[0]]));
+    let recording = false, confirmWipe = false;
+    function draw(msg, cls){
+      const done = CLIPS.filter(c => voiceBufs[c[0]]).length, c = CLIPS[idx], has = !!voiceBufs[c[0]];
+      app.innerHTML =
+        '<div class="rec">' +
+        '<div class="bar"><button type="button" class="small-btn" id="recBack">← Done</button><span style="font-weight:800">' + done + ' of ' + CLIPS.length + ' recorded</span></div>' +
+        '<div class="card"><span class="say-lbl">Say this · ' + (idx+1) + ' of ' + CLIPS.length + '</span>' +
+          '<div class="say">' + c[1] + '</div>' +
+          '<div class="rec-row">' +
+            '<button type="button" class="small-btn" id="recPrev"' + (idx === 0 ? " disabled" : "") + '>← Back</button>' +
+            '<button type="button" class="mic' + (recording ? " on" : "") + '" id="micBtn" aria-label="' + (recording ? "Stop recording" : "Start recording") + '"><span></span></button>' +
+            '<button type="button" class="small-btn" id="recNext"' + (idx === CLIPS.length-1 ? " disabled" : "") + '>Next →</button>' +
+          '</div>' +
+          '<div class="state ' + (cls || "") + '" id="recState" aria-live="polite">' + (msg || (recording ? "Recording… tap the red button to stop." : has ? "✓ Recorded. Tap ▶ to listen, or the red button to redo." : "Tap the red button, say it, then tap again.")) + '</div>' +
+          '<button type="button" class="small-btn" id="recPlay"' + (has ? "" : " disabled") + '>▶ Listen</button>' +
+        '</div>' +
+        '<p class="note">Speak close to the phone in a quiet room. Recordings stay on this iPhone only. Anything you haven\'t recorded yet uses the phone voice.</p>' +
+        '<div class="chips">' + CLIPS.map((x,k) => '<button type="button" class="chip' + (voiceBufs[x[0]] ? " done" : "") + (k === idx ? " cur" : "") + '" data-k="' + k + '">' + x[1].split("  (")[0] + '</button>').join("") + '</div>' +
+        '<button type="button" class="small-btn" id="recWipe" style="align-self:center">' + (confirmWipe ? "Tap again to delete all recordings" : "Delete all recordings") + '</button>' +
+        '</div>';
+      document.getElementById("recBack").addEventListener("click", leave);
+      document.getElementById("recPrev").addEventListener("click", () => { if(!recording){ idx--; draw(); } });
+      document.getElementById("recNext").addEventListener("click", () => { if(!recording){ idx++; draw(); } });
+      document.getElementById("micBtn").addEventListener("click", toggle);
+      document.getElementById("recPlay").addEventListener("click", () => { const b = voiceBufs[CLIPS[idx][0]]; if(b){ stopVoice(); playParts([CLIPS[idx][0]]); } });
+      document.getElementById("recWipe").addEventListener("click", wipe);
+      app.querySelectorAll(".chip").forEach(ch => ch.addEventListener("click", () => { if(!recording){ idx = +ch.dataset.k; draw(); } }));
+    }
+    async function toggle(){
+      if(recording){ stopRec(); return; }
+      if(!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+        draw("This browser can't record here. Open the game from its https:// link in Safari.", "err"); return;
+      }
+      try{
+        audio();
+        if(!micStream) micStream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true}});
+      }catch(e){
+        draw("The microphone is blocked. Allow it when Safari asks, or go to iPhone Settings → Safari → Microphone, then reload.", "err"); return;
+      }
+      const type = ["audio/mp4", "audio/webm;codecs=opus", "audio/webm"].find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t));
+      const chunks = [], id = CLIPS[idx][0];
+      try{ mediaRec = type ? new MediaRecorder(micStream, {mimeType:type}) : new MediaRecorder(micStream); }
+      catch(e){ draw("Recording couldn't start. Reload the page and try again.", "err"); return; }
+      mediaRec.ondataavailable = ev => { if(ev.data && ev.data.size) chunks.push(ev.data); };
+      mediaRec.onstop = async () => {
+        recording = false; clearTimeout(recTimer);
+        try{
+          const blob = new Blob(chunks, {type: mediaRec.mimeType || type || "audio/mp4"});
+          const buf = await blob.arrayBuffer();
+          const decoded = await decode(buf);
+          if(decoded.duration < 0.15){ draw("That was too quiet. Tap the red button and try again a little louder.", "err"); return; }
+          voiceBufs[id] = decoded;
+          await DB.put(id, {buf, type: blob.type});
+          if(S.voice === "phone"){ S.voice = "mine"; saveSettings(); }
+          stopVoice(); playParts([id]);
+          draw("✓ Saved. Listen, then tap Next →", "ok");
+        }catch(e){ draw("That recording didn't save. Tap the red button to try again.", "err"); }
+      };
+      mediaRec.start();
+      recording = true; draw();
+      recTimer = setTimeout(stopRec, 6000);
+    }
+    function stopRec(){ try{ if(mediaRec && mediaRec.state !== "inactive") mediaRec.stop(); }catch(e){} }
+    async function wipe(){
+      if(!confirmWipe){ confirmWipe = true; draw(); return; }
+      try{ await DB.clear(); }catch(e){}
+      Object.keys(voiceBufs).forEach(k => delete voiceBufs[k]);
+      if(S.voice === "mine"){ S.voice = "phone"; saveSettings(); }
+      confirmWipe = false; idx = 0; draw("All recordings deleted.", "ok");
+    }
+    function leave(){
+      stopRec(); stopVoice();
+      if(micStream){ micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+      home();
+    }
+    draw();
   }
 
   document.addEventListener("keydown", e => {
@@ -419,6 +615,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     if(/^[1-3]$/.test(e.key)){ const b = document.getElementById("ans-" + (+e.key-1)); if(b) b.click(); }
   });
 
+  loadVoice();
   home();
 })();
 </script>
