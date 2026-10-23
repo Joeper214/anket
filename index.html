@@ -96,6 +96,15 @@ button:focus-visible{outline:4px solid var(--grape); outline-offset:3px}
 }
 .listen-big:active{transform:translateY(4px); box-shadow:0 2px 0 var(--sea-deep)}
 .word{font-size:2.2rem; font-weight:800}
+.blocks{display:flex; gap:14px; align-items:flex-end; justify-content:center; flex-wrap:wrap; max-width:100%}
+.tens{display:flex; gap:5px; flex-wrap:wrap; justify-content:center; max-width:100%}
+.rod{display:flex; flex-direction:column; gap:2px; padding:3px; background:var(--grape-deep); border-radius:6px; animation:drop .35s ease backwards}
+.rod i{width:clamp(11px, 3.3vw, 16px); aspect-ratio:1; background:#c4baff; border-radius:3px; display:block}
+.ones{display:grid; grid-template-columns:repeat(5, auto); gap:4px; align-content:end}
+.cube{width:clamp(16px, 4.6vw, 22px); aspect-ratio:1; background:var(--sun); border:2px solid var(--sun-deep); border-radius:4px; display:block; animation:drop .35s ease backwards}
+.ans.group .rod i{width:clamp(8px, 2.4vw, 12px)}
+.ans.group .cube{width:clamp(13px, 3.6vw, 18px)}
+.bignum{font-size:clamp(3.2rem, 15vw, 4.6rem); font-weight:800; line-height:1; background:#fff0c2; border:4px solid var(--ink); border-radius:20px; padding:10px 18px 4px; font-variant-numeric:tabular-nums}
 
 .answers{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px}
 .ans{
@@ -160,7 +169,9 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     ["🎈","balloons"],["🍌","bananas"],["🐸","frogs"],["🚀","rockets"],["🦆","ducks"],["🍓","strawberries"]
   ];
   const PRAISE = ["Yes!","Great job!","You got it!","Super!","Awesome!","Well done!"];
-  const ONES = ["zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty"];
+  const ONES = ["zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen"];
+  const TENS = ["","","twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety"];
+  const words = n => n === 100 ? "one hundred" : n < 20 ? ONES[n] : TENS[Math.floor(n/10)] + (n%10 ? "-" + ONES[n%10] : "");
   const ACTS = [
     {id:"count", name:"Count", pic:"🍎", cls:"t1"},
     {id:"listen", name:"Find the number", pic:"👂", cls:"t2"},
@@ -176,7 +187,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
   };
   const saved = store.get("cf-kid") || {};
-  const S = { max: saved.max || 10, sound: saved.sound !== false, round: saved.round || 5,
+  const S = { max: saved.max || 100, sound: saved.sound !== false, round: saved.round || 5,
               screen:"home", act:null, deck:[], i:0, stars:0, busy:false, tries:0 };
   const app = document.getElementById("app");
 
@@ -226,11 +237,20 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
 
   /* ---------- cards ---------- */
   function near(ans, lo, hi){
-    const set = new Set([ans]); let g = 0;
-    while(set.size < 3 && g++ < 100){ const v = ans + rand(-2,2); if(v>=lo && v<=hi) set.add(v); }
+    const opts = hi > 20 ? [ans-10, ans+10, ans-1, ans+1, ans-2, ans+2] : [ans-1, ans+1, ans-2, ans+2];
+    const set = new Set([ans]);
+    shuffle(opts).forEach(v => { if(set.size < 3 && v >= lo && v <= hi) set.add(v); });
     for(let v=lo; set.size<3 && v<=hi+3; v++) set.add(v);
     return shuffle([...set]);
   }
+  function blocks(n, delayStart){
+    const t = Math.floor(n/10), o = n % 10, d = delayStart || 0;
+    let h = '<div class="blocks" role="img" aria-label="' + t + ' tens and ' + o + ' ones">';
+    if(t){ h += '<div class="tens">'; for(let k=0;k<t;k++) h += '<span class="rod" style="animation-delay:' + (d + k*70) + 'ms">' + '<i></i>'.repeat(10) + '</span>'; h += '</div>'; }
+    if(o){ h += '<div class="ones">'; for(let k=0;k<o;k++) h += '<i class="cube" style="animation-delay:' + (d + t*70 + k*45) + 'ms"></i>'; h += '</div>'; }
+    return h + '</div>';
+  }
+  const tensOnes = n => { const t = Math.floor(n/10), o = n%10; return t + (t === 1 ? " ten" : " tens") + (o ? " and " + o + (o === 1 ? " one" : " ones") : ""); };
   function objs(emoji, n, size){
     let h = '<div class="objs" style="font-size:' + size + '">';
     for(let r=0; r<n; r+=5){
@@ -246,11 +266,20 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     const [e, name] = pickOne(THINGS), max = S.max;
     if(act === "count"){
       const n = rand(1, max);
+      if(n > 20){
+        return { key:"c"+n, q:"How many blocks?", speech:"How many blocks? Count the tens, then the ones.", body: blocks(n), answer:n, choices: near(n,1,max), win: tensOnes(n) + " make " + n + "!" };
+      }
       return { key:"c"+n, q:"How many " + name + "?", speech:"How many " + name + "?", body: objs(e, n, sizeFor(n)), answer:n, choices: near(n,1,max), win: n + "!" };
     }
     if(act === "listen"){
       const n = rand(1, max);
       return { key:"l"+n, q:"Find the number", speech:"Find the number " + n, listen:true, n, answer:n, choices: near(n,1,max), win: n + "!" };
+    }
+    if(act === "add" && max > 20){
+      const a = rand(10, max - 1), b = rand(1, Math.min(9, max - a)), r = a + b;
+      return { key:"a"+a+"_"+b, q:"How many altogether?", speech: a + ", and " + b + " more. How many altogether?",
+               body:'<div class="sum"><div class="bignum">' + a + '</div><span class="plus">+</span>' + objs(e,b,"clamp(1.7rem, 8vw, 2.4rem)") + '</div>',
+               answer:r, choices: near(r,1,max), win: a + " and " + b + " make " + r + "!" };
     }
     if(act === "add"){
       const top = Math.min(max, 10), a = rand(1, top-1), b = rand(1, top - a), r = a + b, sz = sizeFor(Math.max(a,b)) ;
@@ -300,12 +329,12 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     let body = c.body || "";
     if(c.listen){
       body = S.sound ? '<button type="button" class="listen-big" id="listenBtn" aria-label="Hear the number again">🔊</button>'
-                     : '<div class="word">' + ONES[c.n] + '</div>';
+                     : '<div class="word">' + words(c.n) + '</div>';
     }
     let answers;
     if(c.groups){
       answers = '<div class="pick2">' + c.groups.map((g,k) =>
-        '<button type="button" class="ans group c' + k + '" id="ans-' + k + '" data-v="' + k + '">' + objs(g.e, g.n, g.n > 10 ? "clamp(1.4rem, 6.5vw, 1.9rem)" : "clamp(1.8rem, 8vw, 2.4rem)") + '</button>').join("") + '</div>';
+        '<button type="button" class="ans group c' + k + '" id="ans-' + k + '" data-v="' + k + '">' + (S.max > 20 ? blocks(g.n) : objs(g.e, g.n, g.n > 10 ? "clamp(1.4rem, 6.5vw, 1.9rem)" : "clamp(1.8rem, 8vw, 2.4rem)")) + '</button>').join("") + '</div>';
     } else {
       answers = '<div class="answers">' + c.choices.map((v,k) =>
         '<button type="button" class="ans c' + k + '" id="ans-' + k + '" data-v="' + v + '">' + v + '</button>').join("") + '</div>';
@@ -369,10 +398,10 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     const sheet = document.createElement("div");
     sheet.className = "sheet"; sheet.id = "sheet";
     sheet.innerHTML = '<div class="panel" role="dialog" aria-label="Settings for grown-ups"><h3>Settings for grown-ups</h3>' +
-      seg("max", [[5,"Up to 5"],[10,"Up to 10"],[20,"Up to 20"]], "Numbers") +
+      seg("max", [[5,"Up to 5"],[10,"Up to 10"],[20,"Up to 20"],[50,"Up to 50"],[100,"Up to 100"]], "Numbers") +
       seg("round", [[5,"5 cards"],[10,"10 cards"]], "Game length") +
       seg("sound", [[true,"Voice on"],[false,"Voice off"]], "Sound") +
-      '<p class="note">Turn the iPhone\'s silent switch off to hear the voice. Adding games stop at 10.</p>' +
+      '<p class="note">Turn the iPhone\'s silent switch off to hear the voice. Above 20, numbers show as purple ten-sticks and yellow single blocks. Big adding games start from a number and add a few more.</p>' +
       '<button type="button" class="big-btn" id="closePanel">Done</button></div>';
     document.body.appendChild(sheet);
     sheet.addEventListener("click", e => { if(e.target === sheet) sheet.remove(); });
