@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Count & Flip">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style>
+<title>Count &amp; Flip</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&display=swap">
+<style>
+/* Layout: one screen at a time — home (four big activity tiles), play (question card + three giant answers), done (stars).
+   Deliberately a single bright daytime look for a young child, so colors are set explicitly for both host themes. */
+:root{
+  --sky:#bfe6ff;
+  --sky-deep:#8fd0fb;
+  --cloud:#ffffff;
+  --ink:#1c2b4a;
+  --ink-soft:#4f6283;
+  --sun:#ffc83d;
+  --sun-deep:#e6a100;
+  --grass:#3fbf6f;
+  --grass-deep:#259150;
+  --berry:#ff6b8b;
+  --berry-deep:#d9466a;
+  --grape:#8f7bff;
+  --grape-deep:#6a54e0;
+  --sea:#2fb6d8;
+  --sea-deep:#1a8fb0;
+  --font:"Baloo 2", "Arial Rounded MT Bold", "Chalkboard SE", "Trebuchet MS", system-ui, sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:linear-gradient(180deg, var(--sky) 0%, var(--sky-deep) 100%) fixed, var(--sky);
+  color:var(--ink); font-family:var(--font); font-size:18px; line-height:1.3;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-block:14px 24px;
+  -webkit-user-select:none; user-select:none; touch-action:manipulation;
+}
+.app{max-width:620px; margin:0 auto; min-height:100%; display:flex; flex-direction:column; gap:14px}
+button{font-family:var(--font); color:var(--ink); cursor:pointer}
+button:focus-visible{outline:4px solid var(--grape); outline-offset:3px}
+
+/* top bar */
+.bar{display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:52px}
+.round-btn{
+  width:52px; height:52px; border-radius:50%; border:3px solid var(--ink); background:var(--cloud);
+  font-size:1.6rem; display:grid; place-items:center; box-shadow:0 4px 0 var(--ink); padding:0; flex:none;
+}
+.round-btn:active{transform:translateY(3px); box-shadow:0 1px 0 var(--ink)}
+.stars{display:flex; gap:4px; flex-wrap:wrap; justify-content:center; font-size:1.7rem; line-height:1; min-width:0}
+.stars .s{filter:grayscale(1) opacity(.35); transition:transform .3s}
+.stars .s.on{filter:none; animation:pop .45s ease}
+.grown{font-size:.85rem; font-weight:700; background:rgba(255,255,255,.7); border:2px solid var(--ink-soft); color:var(--ink-soft); border-radius:999px; padding:6px 12px}
+
+/* home */
+.hello{text-align:center; padding-top:4px}
+.hello h1{font-size:clamp(2.4rem, 11vw, 3.6rem); line-height:1; margin:0; font-weight:800; text-wrap:balance}
+.hello h1 span{color:var(--berry-deep)}
+.hello p{margin:6px 0 0; font-size:1.15rem; color:var(--ink-soft); font-weight:700}
+.tiles{display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px}
+.tile{
+  border:4px solid var(--ink); border-radius:26px; padding:18px 10px 14px; background:var(--cloud);
+  box-shadow:0 6px 0 var(--ink); display:flex; flex-direction:column; align-items:center; gap:6px; min-width:0;
+}
+.tile:active{transform:translateY(4px); box-shadow:0 2px 0 var(--ink)}
+.tile .pic{font-size:clamp(2.6rem, 12vw, 3.6rem); line-height:1}
+.tile .name{font-size:1.35rem; font-weight:800; line-height:1.05}
+.tile.t1{background:#fff0c2} .tile.t2{background:#ffdce4} .tile.t3{background:#d7f5e2} .tile.t4{background:#e4defe}
+
+/* play */
+.card{
+  background:var(--cloud); border:4px solid var(--ink); border-radius:28px; box-shadow:0 6px 0 var(--ink);
+  padding:16px 14px 18px; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center;
+}
+.q{display:flex; align-items:center; justify-content:center; gap:10px; font-size:clamp(1.4rem, 6vw, 1.9rem); font-weight:800; line-height:1.1; text-wrap:balance}
+.speak{
+  width:48px; height:48px; border-radius:50%; border:3px solid var(--sea-deep); background:#dff6fc; font-size:1.4rem;
+  display:grid; place-items:center; padding:0; flex:none;
+}
+.speak:active{transform:scale(.92)}
+.objs{display:flex; flex-direction:column; align-items:center; gap:4px}
+.objs .line{display:flex; gap:4px; justify-content:center}
+.o{display:inline-block; line-height:1.05; animation:drop .35s ease backwards}
+.sum{display:flex; align-items:center; justify-content:center; gap:10px; flex-wrap:wrap}
+.plus{font-size:clamp(2.4rem, 10vw, 3.2rem); font-weight:800; color:var(--grape-deep)}
+.listen-big{
+  width:140px; height:140px; border-radius:50%; border:5px solid var(--sea-deep); background:#dff6fc;
+  font-size:4rem; display:grid; place-items:center; box-shadow:0 6px 0 var(--sea-deep);
+}
+.listen-big:active{transform:translateY(4px); box-shadow:0 2px 0 var(--sea-deep)}
+.word{font-size:2.2rem; font-weight:800}
+
+.answers{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px}
+.ans{
+  min-height:104px; border-radius:24px; border:4px solid var(--ink); box-shadow:0 6px 0 var(--ink);
+  font-size:clamp(3rem, 15vw, 4.4rem); font-weight:800; line-height:1; padding:8px 0 0; min-width:0;
+  font-variant-numeric:tabular-nums;
+}
+.ans:active:not(:disabled){transform:translateY(4px); box-shadow:0 2px 0 var(--ink)}
+.ans.c0{background:#fff0c2} .ans.c1{background:#ffdce4} .ans.c2{background:#dcefff}
+.pick2{display:grid; grid-template-columns:minmax(0,1fr); gap:12px}
+.ans.group{min-height:auto; padding:14px 8px; font-size:1rem}
+.ans.yay{background:#c9f2d8; border-color:var(--grass-deep); box-shadow:0 6px 0 var(--grass-deep); animation:bounce .6s ease}
+.ans.nope{animation:wiggle .45s ease; opacity:.35}
+.ans:disabled{cursor:default}
+
+.cheer{text-align:center; font-size:1.6rem; font-weight:800; min-height:2rem; color:var(--grass-deep)}
+.cheer.again{color:var(--berry-deep)}
+
+/* done */
+.done{text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px; padding:10px 0}
+.done .trophy{font-size:6rem; line-height:1; animation:bounce 1s ease}
+.done h2{font-size:clamp(2.4rem, 10vw, 3.2rem); line-height:1; margin:0}
+.done .stars{font-size:2.4rem}
+.big-btn{
+  border:4px solid var(--ink); border-radius:999px; padding:14px 30px 10px; font-size:1.6rem; font-weight:800;
+  box-shadow:0 6px 0 var(--ink); background:var(--sun); min-width:220px;
+}
+.big-btn.alt{background:var(--cloud)}
+.big-btn:active{transform:translateY(4px); box-shadow:0 2px 0 var(--ink)}
+
+/* grown-ups panel */
+.sheet{position:fixed; inset:0; background:rgba(28,43,74,.45); display:flex; align-items:flex-end; justify-content:center; z-index:20;
+  padding-left:max(12px, env(safe-area-inset-left, 0px)); padding-right:max(12px, env(safe-area-inset-right, 0px));}
+.panel{background:var(--cloud); width:100%; max-width:520px; border-radius:24px 24px 0 0; padding:18px 18px calc(22px + env(safe-area-inset-bottom, 0px)); display:flex; flex-direction:column; gap:14px; font-size:1rem}
+.panel h3{margin:0; font-size:1.4rem}
+.panel .row{display:flex; flex-direction:column; gap:6px}
+.panel .lbl{font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); font-weight:700}
+.seg{display:flex; gap:8px; flex-wrap:wrap}
+.seg button{border:3px solid var(--ink-soft); background:var(--cloud); border-radius:14px; padding:8px 16px 5px; font-size:1.1rem; font-weight:700; color:var(--ink)}
+.seg button[aria-pressed="true"]{border-color:var(--ink); background:var(--sun); box-shadow:0 3px 0 var(--ink)}
+.panel .note{font-size:.9rem; color:var(--ink-soft); margin:0; line-height:1.4}
+
+canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:30}
+
+@keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.35)}100%{transform:scale(1)}}
+@keyframes drop{from{transform:translateY(-14px) scale(.6); opacity:0}to{transform:none; opacity:1}}
+@keyframes bounce{0%,100%{transform:translateY(0)}30%{transform:translateY(-14px)}60%{transform:translateY(0)}80%{transform:translateY(-5px)}}
+@keyframes wiggle{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(10px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}
+@media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important} }
+</style>
+</head>
+<body>
+
+
+<div class="app" id="app"></div>
+<canvas id="fx"></canvas>
+
+<script>
+(function(){
+  const THINGS = [
+    ["🍎","apples"],["🐟","fish"],["⭐","stars"],["🚗","cars"],["🐶","puppies"],["🦖","dinosaurs"],
+    ["🎈","balloons"],["🍌","bananas"],["🐸","frogs"],["🚀","rockets"],["🦆","ducks"],["🍓","strawberries"]
+  ];
+  const PRAISE = ["Yes!","Great job!","You got it!","Super!","Awesome!","Well done!"];
+  const ONES = ["zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen","twenty"];
+  const ACTS = [
+    {id:"count", name:"Count", pic:"🍎", cls:"t1"},
+    {id:"listen", name:"Find the number", pic:"👂", cls:"t2"},
+    {id:"add", name:"Add them up", pic:"➕", cls:"t3"},
+    {id:"more", name:"Which has more?", pic:"⚖️", cls:"t4"}
+  ];
+
+  const rand = (a,b) => a + Math.floor(Math.random()*(b-a+1));
+  const pickOne = a => a[rand(0,a.length-1)];
+  const shuffle = a => { for(let i=a.length-1;i>0;i--){const j=rand(0,i);[a[i],a[j]]=[a[j],a[i]];} return a; };
+  const store = {
+    get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
+    set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+  };
+  const saved = store.get("cf-kid") || {};
+  const S = { max: saved.max || 10, sound: saved.sound !== false, round: saved.round || 5,
+              screen:"home", act:null, deck:[], i:0, stars:0, busy:false, tries:0 };
+  const app = document.getElementById("app");
+
+  /* ---------- sound ---------- */
+  let actx = null;
+  function tone(freq, start, dur, type){
+    try{
+      if(!actx) actx = new (window.AudioContext || window.webkitAudioContext)();
+      const t = actx.currentTime + start, o = actx.createOscillator(), g = actx.createGain();
+      o.type = type || "sine"; o.frequency.value = freq;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t+0.02); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+      o.connect(g); g.connect(actx.destination); o.start(t); o.stop(t+dur+0.05);
+    }catch(e){}
+  }
+  const chime = () => { if(!S.sound) return; tone(660,0,.18); tone(880,.12,.22); tone(1175,.26,.35); };
+  const boop = () => { if(!S.sound) return; tone(300,0,.2,"triangle"); tone(240,.12,.25,"triangle"); };
+  function say(text){
+    if(!S.sound) return;
+    try{
+      const sy = window.speechSynthesis; if(!sy) return;
+      sy.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.rate = 0.85; u.pitch = 1.15; u.lang = "en-US";
+      sy.speak(u);
+    }catch(e){}
+  }
+
+  /* ---------- confetti ---------- */
+  const fx = document.getElementById("fx"), ctx = fx.getContext("2d");
+  const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let bits = [], raf = 0;
+  function confetti(){
+    if(reduce) return;
+    const dpr = window.devicePixelRatio || 1;
+    fx.width = innerWidth*dpr; fx.height = innerHeight*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+    const cols = ["#ffc83d","#ff6b8b","#3fbf6f","#8f7bff","#2fb6d8"];
+    for(let k=0;k<70;k++) bits.push({x:innerWidth/2, y:innerHeight*0.45, vx:(Math.random()-.5)*12, vy:-Math.random()*12-4, r:Math.random()*6+4, c:pickOne(cols), a:Math.random()*6, life:70+Math.random()*30});
+    if(!raf) loop();
+  }
+  function loop(){
+    ctx.clearRect(0,0,innerWidth,innerHeight);
+    bits = bits.filter(b => b.life-- > 0);
+    bits.forEach(b => { b.vy += .35; b.x += b.vx; b.y += b.vy; b.a += .2; ctx.save(); ctx.translate(b.x,b.y); ctx.rotate(b.a); ctx.fillStyle=b.c; ctx.fillRect(-b.r/2,-b.r/4,b.r,b.r/2); ctx.restore(); });
+    raf = bits.length ? requestAnimationFrame(loop) : 0;
+    if(!raf) ctx.clearRect(0,0,innerWidth,innerHeight);
+  }
+
+  /* ---------- cards ---------- */
+  function near(ans, lo, hi){
+    const set = new Set([ans]); let g = 0;
+    while(set.size < 3 && g++ < 100){ const v = ans + rand(-2,2); if(v>=lo && v<=hi) set.add(v); }
+    for(let v=lo; set.size<3 && v<=hi+3; v++) set.add(v);
+    return shuffle([...set]);
+  }
+  function objs(emoji, n, size){
+    let h = '<div class="objs" style="font-size:' + size + '">';
+    for(let r=0; r<n; r+=5){
+      h += '<div class="line">';
+      for(let k=r; k<Math.min(n, r+5); k++) h += '<span class="o" style="animation-delay:' + (k*45) + 'ms">' + emoji + '</span>';
+      h += '</div>';
+    }
+    return h + '</div>';
+  }
+  const sizeFor = n => n <= 5 ? "clamp(2.6rem, 12vw, 3.4rem)" : n <= 10 ? "clamp(2.1rem, 10vw, 2.8rem)" : "clamp(1.6rem, 7.5vw, 2.2rem)";
+
+  function makeCard(act){
+    const [e, name] = pickOne(THINGS), max = S.max;
+    if(act === "count"){
+      const n = rand(1, max);
+      return { key:"c"+n, q:"How many " + name + "?", speech:"How many " + name + "?", body: objs(e, n, sizeFor(n)), answer:n, choices: near(n,1,max), win: n + "!" };
+    }
+    if(act === "listen"){
+      const n = rand(1, max);
+      return { key:"l"+n, q:"Find the number", speech:"Find the number " + n, listen:true, n, answer:n, choices: near(n,1,max), win: n + "!" };
+    }
+    if(act === "add"){
+      const top = Math.min(max, 10), a = rand(1, top-1), b = rand(1, top - a), r = a + b, sz = sizeFor(Math.max(a,b)) ;
+      return { key:"a"+a+"_"+b, q:"How many altogether?", speech: a + " " + name + ", and " + b + " more. How many altogether?",
+               body:'<div class="sum">' + objs(e,a,"clamp(1.7rem, 8vw, 2.4rem)") + '<span class="plus">+</span>' + objs(e,b,"clamp(1.7rem, 8vw, 2.4rem)") + '</div>',
+               answer:r, choices: near(r,1,top), win: a + " and " + b + " make " + r + "!" };
+    }
+    let a = rand(1, max), b = rand(1, max); while(b === a) b = rand(1, max);
+    const e2 = pickOne(THINGS.filter(t => t[0] !== e));
+    const groups = shuffle([{n:a, e}, {n:b, e:e2[0]}]);
+    const big = Math.max(a,b), winner = groups.findIndex(g => g.n === big);
+    return { key:"m"+Math.min(a,b)+"_"+big, q:"Which has more?", speech:"Which group has more?", groups, answer:winner, win: big + " is more!" };
+  }
+
+  function deck(act){
+    const seen = new Set(), d = []; let g = 0;
+    while(d.length < S.round && g++ < 300){ const c = makeCard(act); if(!seen.has(c.key) || g > 200){ seen.add(c.key); d.push(c); } }
+    return d;
+  }
+
+  /* ---------- screens ---------- */
+  function starsHTML(){
+    let h = '<div class="stars" aria-label="' + S.stars + ' stars">';
+    for(let k=0;k<S.round;k++) h += '<span class="s' + (k < S.stars ? " on" : "") + '" id="st-' + k + '">⭐</span>';
+    return h + '</div>';
+  }
+
+  function home(){
+    S.screen = "home";
+    app.innerHTML =
+      '<div class="bar"><span></span><button type="button" class="grown" id="grownBtn">Grown-ups ⚙︎</button></div>' +
+      '<div class="hello"><h1>Count <span>&amp;</span> Flip</h1><p>Pick a game!</p></div>' +
+      '<div class="tiles">' + ACTS.map(a => '<button type="button" class="tile ' + a.cls + '" id="act-' + a.id + '" data-act="' + a.id + '"><span class="pic">' + a.pic + '</span><span class="name">' + a.name + '</span></button>').join("") + '</div>';
+    app.querySelectorAll(".tile").forEach(t => t.addEventListener("click", () => start(t.dataset.act)));
+    document.getElementById("grownBtn").addEventListener("click", openPanel);
+  }
+
+  function start(act){
+    S.act = act; S.deck = deck(act); S.i = 0; S.stars = 0;
+    tone(1,0,.01); // unlock audio on iPhone with this tap
+    play();
+  }
+
+  function play(){
+    S.screen = "play"; S.busy = false; S.tries = 0;
+    const c = S.deck[S.i];
+    let body = c.body || "";
+    if(c.listen){
+      body = S.sound ? '<button type="button" class="listen-big" id="listenBtn" aria-label="Hear the number again">🔊</button>'
+                     : '<div class="word">' + ONES[c.n] + '</div>';
+    }
+    let answers;
+    if(c.groups){
+      answers = '<div class="pick2">' + c.groups.map((g,k) =>
+        '<button type="button" class="ans group c' + k + '" id="ans-' + k + '" data-v="' + k + '">' + objs(g.e, g.n, g.n > 10 ? "clamp(1.4rem, 6.5vw, 1.9rem)" : "clamp(1.8rem, 8vw, 2.4rem)") + '</button>').join("") + '</div>';
+    } else {
+      answers = '<div class="answers">' + c.choices.map((v,k) =>
+        '<button type="button" class="ans c' + k + '" id="ans-' + k + '" data-v="' + v + '">' + v + '</button>').join("") + '</div>';
+    }
+    app.innerHTML =
+      '<div class="bar"><button type="button" class="round-btn" id="homeBtn" aria-label="Home">🏠</button>' + starsHTML() + '<span style="width:52px;flex:none"></span></div>' +
+      '<div class="card"><div class="q"><span>' + c.q + '</span>' + (S.sound ? '<button type="button" class="speak" id="speakBtn" aria-label="Say it again">🔊</button>' : '') + '</div>' + body + '</div>' +
+      answers +
+      '<div class="cheer" id="cheer" aria-live="polite"></div>';
+    document.getElementById("homeBtn").addEventListener("click", () => { try{ speechSynthesis.cancel(); }catch(e){} home(); });
+    const sp = document.getElementById("speakBtn"); if(sp) sp.addEventListener("click", () => say(c.speech));
+    const lb = document.getElementById("listenBtn"); if(lb) lb.addEventListener("click", () => say(c.speech));
+    app.querySelectorAll(".ans").forEach(b => b.addEventListener("click", () => answer(b)));
+    setTimeout(() => say(c.speech), 250);
+  }
+
+  function answer(btn){
+    if(S.busy || btn.disabled) return;
+    const c = S.deck[S.i], cheer = document.getElementById("cheer");
+    const ok = String(btn.dataset.v) === String(c.answer);
+    if(ok){
+      S.busy = true;
+      btn.classList.add("yay");
+      app.querySelectorAll(".ans").forEach(b => { if(b !== btn) b.disabled = true; });
+      const p = pickOne(PRAISE);
+      cheer.className = "cheer"; cheer.textContent = p + " " + c.win;
+      chime(); confetti(); say(p + " " + c.win);
+      S.stars++;
+      const st = document.getElementById("st-" + (S.stars-1)); if(st) st.classList.add("on");
+      setTimeout(next, 2000);
+    } else {
+      S.tries++;
+      btn.classList.add("nope"); btn.disabled = true;
+      cheer.className = "cheer again"; cheer.textContent = "Oops! Try again.";
+      boop(); say("Oops! Try again.");
+    }
+  }
+
+  function next(){
+    S.i++;
+    if(S.i >= S.deck.length) done(); else play();
+  }
+
+  function done(){
+    S.screen = "done";
+    const total = (store.get("cf-kid-stars") || 0) + S.stars; store.set("cf-kid-stars", total);
+    app.innerHTML =
+      '<div class="done"><div class="trophy">🏆</div><h2>You did it!</h2>' + starsHTML() +
+      '<p style="margin:0;font-size:1.2rem;font-weight:700;color:var(--ink-soft)">' + total + ' stars collected so far</p>' +
+      '<button type="button" class="big-btn" id="againBtn">Play again</button>' +
+      '<button type="button" class="big-btn alt" id="homeBtn2">🏠 Home</button></div>';
+    confetti(); chime(); say("You did it! You got " + S.stars + " stars!");
+    document.getElementById("againBtn").addEventListener("click", () => start(S.act));
+    document.getElementById("homeBtn2").addEventListener("click", home);
+  }
+
+  /* ---------- grown-ups panel ---------- */
+  function openPanel(){
+    const seg = (key, vals, label) => '<div class="row"><span class="lbl">' + label + '</span><div class="seg">' +
+      vals.map(v => '<button type="button" id="opt-' + key + '-' + v[0] + '" data-k="' + key + '" data-v="' + v[0] + '" aria-pressed="' + (String(S[key]) === String(v[0])) + '">' + v[1] + '</button>').join("") + '</div></div>';
+    const sheet = document.createElement("div");
+    sheet.className = "sheet"; sheet.id = "sheet";
+    sheet.innerHTML = '<div class="panel" role="dialog" aria-label="Settings for grown-ups"><h3>Settings for grown-ups</h3>' +
+      seg("max", [[5,"Up to 5"],[10,"Up to 10"],[20,"Up to 20"]], "Numbers") +
+      seg("round", [[5,"5 cards"],[10,"10 cards"]], "Game length") +
+      seg("sound", [[true,"Voice on"],[false,"Voice off"]], "Sound") +
+      '<p class="note">Turn the iPhone\'s silent switch off to hear the voice. Adding games stop at 10.</p>' +
+      '<button type="button" class="big-btn" id="closePanel">Done</button></div>';
+    document.body.appendChild(sheet);
+    sheet.addEventListener("click", e => { if(e.target === sheet) sheet.remove(); });
+    sheet.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
+      const k = b.dataset.k; let v = b.dataset.v;
+      S[k] = k === "sound" ? v === "true" : +v;
+      store.set("cf-kid", {max:S.max, sound:S.sound, round:S.round});
+      sheet.querySelectorAll('.seg button[data-k="' + k + '"]').forEach(x => x.setAttribute("aria-pressed", x === b));
+    }));
+    document.getElementById("closePanel").addEventListener("click", () => sheet.remove());
+  }
+
+  document.addEventListener("keydown", e => {
+    if(S.screen !== "play") return;
+    if(/^[1-3]$/.test(e.key)){ const b = document.getElementById("ans-" + (+e.key-1)); if(b) b.click(); }
+  });
+
+  home();
+})();
+</script>
+
+</body>
+</html>
