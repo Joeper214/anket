@@ -169,6 +169,57 @@ button:focus-visible{outline:4px solid var(--grape); outline-offset:3px}
 @keyframes pulse{0%,100%{box-shadow:0 6px 0 var(--ink), 0 0 0 0 rgba(255,107,139,.6)}50%{box-shadow:0 6px 0 var(--ink), 0 0 0 14px rgba(255,107,139,0)}}
 .panel .note{font-size:.9rem; color:var(--ink-soft); margin:0; line-height:1.4}
 
+/* home sections */
+.section{display:flex; flex-direction:column; gap:10px}
+.section h2{margin:0; font-size:1.35rem; font-weight:800; display:flex; align-items:center; gap:8px}
+.section h2::after{content:""; flex:1; height:3px; border-radius:2px; background:rgba(28,43,74,.18)}
+.tile.t5{background:#dcefff} .tile.t6{background:#ffe3c9}
+.music-btn[aria-pressed="false"]{opacity:.55}
+
+/* letters and words */
+.bigletter{font-size:clamp(5rem, 28vw, 8rem); font-weight:800; line-height:.9; padding-top:.08em}
+.pic-big{font-size:clamp(5rem, 26vw, 7.5rem); line-height:1}
+.pic-word{font-size:clamp(1.8rem, 8vw, 2.4rem); font-weight:800; line-height:1}
+.readword{display:flex; gap:8px; justify-content:center; flex-wrap:wrap}
+.lt{
+  font-size:clamp(3rem, 15vw, 4.4rem); font-weight:800; line-height:1; min-width:1.15em; padding:10px 8px 2px;
+  background:#fff0c2; border:4px solid var(--ink); border-radius:18px; box-shadow:0 5px 0 var(--ink);
+}
+.lt:active, .lt.hit{transform:translateY(3px); box-shadow:0 2px 0 var(--ink); background:var(--sun)}
+.tap-tip{font-size:1rem; color:var(--ink-soft); font-weight:700; margin:0}
+.ans .pa{display:block; font-size:clamp(2.6rem, 13vw, 3.6rem); line-height:1}
+.ans .pw{display:block; font-size:clamp(1.05rem, 4.8vw, 1.35rem); font-weight:800; margin-top:4px; overflow-wrap:anywhere}
+.ans.pic{font-size:clamp(2.8rem, 14vw, 4rem); padding:10px 4px 6px}
+.ans.ltr{text-transform:none}
+
+/* ABC board */
+.abc{display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px}
+@media (min-width:520px){ .abc{grid-template-columns:repeat(6, minmax(0,1fr))} }
+.abc button{
+  border:3px solid var(--ink); border-radius:18px; box-shadow:0 4px 0 var(--ink); background:var(--cloud);
+  padding:8px 2px 6px; display:flex; flex-direction:column; align-items:center; gap:2px; min-width:0;
+}
+.abc button:nth-child(6n+1){background:#fff0c2} .abc button:nth-child(6n+2){background:#ffdce4} .abc button:nth-child(6n+3){background:#d7f5e2}
+.abc button:nth-child(6n+4){background:#e4defe} .abc button:nth-child(6n+5){background:#dcefff} .abc button:nth-child(6n){background:#ffe3c9}
+.abc .al{font-size:clamp(1.7rem, 8vw, 2.2rem); font-weight:800; line-height:1}
+.abc .ae{font-size:clamp(1.4rem, 6.5vw, 1.8rem); line-height:1}
+.abc button:active, .abc button.hit{transform:translateY(3px); box-shadow:0 1px 0 var(--ink); outline:4px solid var(--grape)}
+.abc-say{text-align:center; min-height:4.2rem; display:flex; align-items:center; justify-content:center; gap:14px}
+.abc-say .bl{font-size:3.4rem; font-weight:800; line-height:1}
+.abc-say .bw{font-size:1.6rem; font-weight:800; line-height:1.1; text-align:left}
+.abc-say .bw small{display:block; font-size:1rem; color:var(--ink-soft)}
+
+/* tracing */
+.trace-box{width:100%; max-width:340px; aspect-ratio:1; position:relative}
+.trace-box canvas{width:100%; height:100%; display:block; border-radius:22px; background:#fffdf5; border:4px solid var(--ink); touch-action:none}
+.trace-row{display:flex; justify-content:center; gap:12px; flex-wrap:wrap}
+
+.tile.wide{grid-column:1 / -1; flex-direction:row; justify-content:center; gap:14px}
+.grp{flex-basis:100%; font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; font-weight:800; color:var(--ink-soft); margin-top:6px}
+.rec .say small{display:block; font-size:1rem; font-weight:700; color:var(--ink-soft)}
+.panel{max-height:92vh; overflow-y:auto}
+.abc-say .bw small{font-weight:700}
+
 canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:30}
 
 @keyframes pop{0%{transform:scale(.4)}60%{transform:scale(1.35)}100%{transform:scale(1)}}
@@ -209,7 +260,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
   };
   const saved = store.get("cf-kid") || {};
-  const S = { max: saved.max || 100, voice: saved.voice || (saved.sound === false ? "off" : "phone"), round: saved.round || 5,
+  const S = { max: saved.max || 100, voice: saved.voice || (saved.sound === false ? "off" : "phone"), round: saved.round || 5, letters: saved.letters || "both", words: saved.words || "short", music: saved.music !== false,
               screen:"home", act:null, deck:[], i:0, stars:0, busy:false, tries:0 };
   const app = document.getElementById("app");
 
@@ -242,6 +293,49 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     }catch(e){}
   }
 
+  /* ---------- background music ---------- */
+  const SCALE = [0,2,4,7,9,12,14,16,19];
+  const PHRASES = [[4,-1,5,4,3,-1,2,-1],[2,3,4,-1,2,-1,0,-1],[4,-1,5,6,5,4,3,2],[3,2,0,-1,1,-1,0,-1]];
+  const BASSES = [0,3,0,2];
+  const mus = {timer:0, next:0, step:0, gain:null};
+  let musicArmed = false;
+  const hz = semi => 261.63 * Math.pow(2, semi/12);
+  function mnote(freq, t, dur, vol, type){
+    const a = actx, o = a.createOscillator(), g = a.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t+0.03); g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g); g.connect(mus.gain); o.start(t); o.stop(t+dur+0.05);
+  }
+  function musicTick(){
+    const a = actx; if(!a || !mus.gain) return;
+    while(mus.next < a.currentTime + 0.8){
+      const ph = Math.floor(mus.step/8) % PHRASES.length, k = mus.step % 8, d = PHRASES[ph][k];
+      if(k === 0) mnote(hz(SCALE[BASSES[ph]] - 12), mus.next, 2.4, 0.06, "triangle");
+      if(k === 4) mnote(hz(SCALE[BASSES[ph]]), mus.next, 1.2, 0.025, "sine");
+      if(d >= 0){ mnote(hz(SCALE[d]), mus.next, 0.5, 0.07, "sine"); mnote(hz(SCALE[d]) * 2, mus.next, 0.25, 0.015, "sine"); }
+      mus.next += 0.34; mus.step++;
+    }
+  }
+  function musicStart(){
+    const a = audio(); if(!a || mus.timer) return;
+    if(!mus.gain){ mus.gain = a.createGain(); mus.gain.connect(a.destination); }
+    mus.gain.gain.cancelScheduledValues(a.currentTime);
+    mus.gain.gain.setValueAtTime(0.0001, a.currentTime); mus.gain.gain.linearRampToValueAtTime(1, a.currentTime + 1.2);
+    mus.next = a.currentTime + 0.1;
+    musicTick(); mus.timer = setInterval(musicTick, 250);
+  }
+  function musicStop(){
+    if(!mus.timer) return;
+    clearInterval(mus.timer); mus.timer = 0;
+    if(actx && mus.gain){ mus.gain.gain.cancelScheduledValues(actx.currentTime); mus.gain.gain.setTargetAtTime(0.0001, actx.currentTime, 0.12); }
+  }
+  function applyMusic(){ if(musicArmed && S.music && S.screen !== "rec") musicStart(); else musicStop(); }
+  function musicBtnHTML(){ return '<button type="button" class="round-btn music-btn" id="musicBtn" aria-label="Background music" aria-pressed="' + S.music + '">🎵</button>'; }
+  function bindMusicBtn(){
+    const b = document.getElementById("musicBtn"); if(!b) return;
+    b.addEventListener("click", () => { S.music = !S.music; saveSettings(); musicArmed = true; applyMusic(); b.setAttribute("aria-pressed", String(S.music)); });
+  }
+
   /* ---------- recorded voice ---------- */
   const CLIPS = [
     ["howmany","How many are there?"], ["counttens","Count the tens, then the ones."], ["findnum","Find the number"],
@@ -252,6 +346,13 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
   for(let n=0; n<20; n++) CLIPS.push(["n"+n, String(n) + "  (" + ONES[n] + ")"]);
   for(let n=20; n<=90; n+=10) CLIPS.push(["n"+n, String(n) + "  (" + TENS[n/10] + ")"]);
   CLIPS.push(["n100", "100  (one hundred)"]);
+  const SOUNDTXT = {a:"ah",b:"buh",c:"kuh",d:"duh",e:"eh",f:"fff",g:"guh",h:"huh",i:"ih",j:"juh",k:"kuh",l:"lll",m:"mmm",n:"nnn",o:"aw",p:"puh",q:"kwuh",r:"rrr",s:"sss",t:"tuh",u:"uh",v:"vvv",w:"wuh",x:"ks",y:"yuh",z:"zzz"};
+  const READING_PHRASES = [["findletter","Find the letter"],["findsmall","Find the small letter"],["findbig","Find the big letter"],["whichsays","Which letter says"],["whatfirst","What is the first letter?"],["rhymeswith","Which one rhymes with"],["readword","Read the word"],["traceit","Trace the letter"]];
+  const READING_IDS = new Set(READING_PHRASES.map(p => p[0]));
+  READING_PHRASES.forEach(p => CLIPS.push(p));
+  "abcdefghijklmnopqrstuvwxyz".split("").forEach(l => CLIPS.push(["L_"+l, l.toUpperCase() + "  (say the letter name)"]));
+  "abcdefghijklmnopqrstuvwxyz".split("").forEach(l => CLIPS.push(["s_"+l, SOUNDTXT[l] + "  (the sound of " + l.toUpperCase() + ")"]));
+  const clipGroup = id => /^n\d/.test(id) ? "Numbers" : id.startsWith("L_") ? "Letter names" : id.startsWith("s_") ? "Letter sounds" : READING_IDS.has(id) ? "Reading phrases" : "Game phrases";
   const numParts = n => n < 20 || n === 100 ? ["n"+n] : ["n" + (Math.floor(n/10)*10)].concat(n % 10 ? ["n" + (n % 10)] : []);
   const voiceBufs = {};
   let playing = [];
@@ -309,18 +410,21 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     try{ window.speechSynthesis && speechSynthesis.cancel(); }catch(e){}
   }
   function playParts(ids){
-    const a = audio(); if(!a) return;
-    let t = a.currentTime + 0.05;
+    const a = audio(); if(!a) return null;
+    let t = a.currentTime + 0.05, last = null;
     ids.forEach(id => {
       const src = a.createBufferSource(); src.buffer = voiceBufs[id]; src.connect(a.destination);
-      src.start(t); t += voiceBufs[id].duration + 0.05; playing.push(src);
+      src.start(t); t += voiceBufs[id].duration + 0.05; playing.push(src); last = src;
     });
+    return last;
   }
-  function speak(parts, text){
+  function speak(parts, text, tail){
     if(!soundOn()) return;
     stopVoice();
-    if(S.voice === "mine" && parts && parts.length && parts.every(p => voiceBufs[p])) playParts(parts);
-    else tts(text);
+    if(S.voice === "mine" && parts && parts.length && parts.every(p => voiceBufs[p])){
+      const last = playParts(parts);
+      if(tail && last) last.onended = () => { if(playing.includes(last)) tts(tail); };
+    } else tts(text);
   }
 
   /* ---------- confetti ---------- */
@@ -372,6 +476,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
 
   function makeCard(act){
     const [e, name] = pickOne(THINGS), max = S.max;
+    if(READ_IDS.includes(act)) return makeReadCard(act);
     if(act === "count"){
       const n = rand(1, max);
       if(n > 20){
@@ -402,6 +507,98 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     return { key:"m"+Math.min(a,b)+"_"+big, q:"Which has more?", speech:"Which group has more?", parts:["whichmore"], winNum:big, groups, answer:winner, win: big + " is more!" };
   }
 
+  /* ---------- letters and reading ---------- */
+  const LETTER_IDS = "abcdefghijklmnopqrstuvwxyz".split("");
+  const LET = {
+    a:["apple","🍎"], b:["ball","⚽"], c:["cat","🐱"], d:["dog","🐶"], e:["elephant","🐘"], f:["fish","🐟"], g:["grapes","🍇"],
+    h:["hat","🎩"], i:["ice cream","🍦"], j:["juice","🧃"], k:["kite","🪁"], l:["lion","🦁"], m:["moon","🌙"], n:["nose","👃"],
+    o:["orange","🍊"], p:["pig","🐷"], q:["queen","👑"], r:["rabbit","🐰"], s:["sun","☀️"], t:["tree","🌳"], u:["umbrella","☂️"],
+    v:["van","🚐"], w:["whale","🐳"], x:["x-ray","🩻"], y:["yo-yo","🪀"], z:["zebra","🦓"]
+  };
+  const CONF = {b:"dpq",d:"bpq",p:"bdq",q:"bdp",m:"nw",n:"mh",u:"nv",w:"mv",v:"uw",i:"jl",l:"ij",j:"il",e:"ac",a:"eo",o:"ac",c:"eo",f:"t",t:"f",g:"qy",y:"gv",h:"nb",k:"xh",s:"z",z:"s",r:"n",x:"k"};
+  const SHORT_WORDS = [["cat","🐱"],["dog","🐶"],["sun","☀️"],["pig","🐷"],["hat","🎩"],["bus","🚌"],["bed","🛏️"],["bat","🦇"],["fox","🦊"],["hen","🐔"],["pen","🖊️"],["box","📦"],["bug","🐛"],["cow","🐄"],["owl","🦉"],["ant","🐜"],["bee","🐝"],["key","🔑"],["egg","🥚"],["car","🚗"],["map","🗺️"],["log","🪵"],["rat","🐀"],["web","🕸️"]];
+  const LONG_WORDS = [["frog","🐸"],["cake","🍰"],["fish","🐟"],["duck","🦆"],["bear","🐻"],["star","⭐"],["moon","🌙"],["tree","🌳"],["ship","🚢"],["bird","🐦"],["milk","🥛"],["door","🚪"],["boat","⛵"],["kite","🪁"],["apple","🍎"],["horse","🐴"],["mouse","🐭"],["train","🚂"],["snake","🐍"],["house","🏠"],["clock","🕐"],["shoe","👟"],["whale","🐳"],["grape","🍇"]];
+  const RHYMES = [
+    [["cat","🐱"],["hat","🎩"],["bat","🦇"],["rat","🐀"]],
+    [["dog","🐶"],["frog","🐸"],["log","🪵"]],
+    [["bee","🐝"],["tree","🌳"],["key","🔑"]],
+    [["cake","🍰"],["snake","🐍"],["lake","🏞️"]],
+    [["boat","⛵"],["goat","🐐"],["coat","🧥"]],
+    [["car","🚗"],["star","⭐"],["guitar","🎸"]],
+    [["house","🏠"],["mouse","🐭"]],
+    [["bug","🐛"],["mug","☕"],["hug","🤗"]],
+    [["box","📦"],["fox","🦊"]],
+    [["snail","🐌"],["whale","🐳"],["mail","📬"]],
+    [["bear","🐻"],["chair","🪑"],["pear","🍐"]],
+    [["moon","🌙"],["spoon","🥄"],["balloon","🎈"]],
+    [["ring","💍"],["king","🤴"]],
+    [["bed","🛏️"],["sled","🛷"],["red","🔴"]],
+    [["book","📖"],["cook","🧑‍🍳"],["hook","🪝"]],
+    [["clock","🕐"],["sock","🧦"],["rock","🪨"]],
+    [["ball","⚽"],["wall","🧱"]]
+  ];
+  const READ_IDS = ["findletter","sound","firstletter","readword","rhyme","trace"];
+  const WORD_EMOJI = {}; SHORT_WORDS.concat(LONG_WORDS).forEach(w => WORD_EMOJI[w[0]] = w[1]);
+
+  const pickCase = () => S.letters === "caps" ? "U" : S.letters === "small" ? "L" : (Math.random() < .5 ? "U" : "L");
+  const fmt = (l, c) => c === "U" ? l.toUpperCase() : l;
+  function letterChoices(t, exclude){
+    const out = [t], ex = (exclude || "") + t;
+    shuffle((CONF[t] || "").split("").filter(l => !ex.includes(l))).slice(0,1).forEach(l => out.push(l));
+    let g = 0;
+    while(out.length < 3 && g++ < 300){ const l = pickOne(LETTER_IDS); if(!out.includes(l) && !ex.includes(l)) out.push(l); }
+    return shuffle(out);
+  }
+  function wordPool(){ return S.words === "long" ? LONG_WORDS : S.words === "mixed" ? SHORT_WORDS.concat(LONG_WORDS) : SHORT_WORDS; }
+
+  function makeReadCard(act){
+    const c = pickCase();
+    if(act === "findletter"){
+      const t = pickOne(LETTER_IDS), T = t.toUpperCase();
+      const common = { winParts:["L_"+t, "s_"+t], win: T + " says " + SOUNDTXT[t] + "!", answer:t, choices: letterChoices(t) };
+      if(S.letters === "both" && Math.random() < .55){
+        const showUp = Math.random() < .5, cc = showUp ? "L" : "U";
+        const word = showUp ? "Find the small letter" : "Find the big letter";
+        return Object.assign({ key:"fm"+t+cc, q:word, speech: word + " " + T, parts:[showUp ? "findsmall" : "findbig", "L_"+t],
+          body:'<div class="bigletter">' + (showUp ? T : t) + '</div>', html: v => fmt(v, cc), ansCls:" ltr" }, common);
+      }
+      return Object.assign({ key:"fl"+t+c, q:"Find the letter", speech:"Find the letter " + T, parts:["findletter", "L_"+t],
+        listen:true, listenText: fmt(t, c), html: v => fmt(v, c), ansCls:" ltr" }, common);
+    }
+    if(act === "sound"){
+      const t = pickOne(LETTER_IDS), T = t.toUpperCase(), snd = SOUNDTXT[t];
+      return { key:"so"+t+c, q:"Which letter says…", speech:"Which letter says " + snd + "?", parts:["whichsays", "s_"+t],
+        listen:true, listenText: snd, answer:t, choices: letterChoices(t, t === "c" ? "k" : t === "k" ? "c" : ""),
+        html: v => fmt(v, c), ansCls:" ltr", winParts:["L_"+t, "s_"+t], win: T + " says " + snd + "!" };
+    }
+    if(act === "firstletter"){
+      const t = pickOne(LETTER_IDS.filter(l => l !== "x")), T = t.toUpperCase(), w = LET[t][0], e = LET[t][1];
+      return { key:"fi"+t+c, q:"What letter does " + w + " start with?", speech:"What letter does " + w + " start with?",
+        parts:["whatfirst"], tail:w, body:'<div class="pic-big">' + e + '</div><div class="pic-word">' + w + '</div>',
+        answer:t, choices: letterChoices(t, "x"), html: v => fmt(v, c), ansCls:" ltr",
+        winParts:["L_"+t], winTail:"is for " + w, win: T + " is for " + w + "!" };
+    }
+    if(act === "readword"){
+      const pool = wordPool(), w = pickOne(pool), others = shuffle(pool.filter(x => x[0] !== w[0] && x[1] !== w[1] && x[0][0] !== w[0][0])).slice(0,2);
+      return { key:"rw"+w[0], q:"Read the word", speech:"Read the word. Which picture is it?", parts:["readword"], word:w[0],
+        answer:w[0], choices: shuffle([w[0]].concat(others.map(x => x[0]))), html: v => '<span class="pa">' + WORD_EMOJI[v] + '</span>', ansCls:" pic",
+        help:true, helpText:w[0], winParts:[], winTail:w[0], win: w[0] + "!" };
+    }
+    if(act === "rhyme"){
+      const sets = shuffle(RHYMES.slice()), s1 = sets[0], pair = shuffle(s1.slice()), t = pair[0], a = pair[1];
+      const d = sets.slice(1, 3).map(s => pickOne(s));
+      const all = shuffle([a, d[0], d[1]]);
+      return { key:"ry"+t[0]+a[0], q:"Which one rhymes with " + t[0] + "?", speech:"Which one rhymes with " + t[0] + "?", parts:["rhymeswith"], tail:t[0],
+        body:'<div class="pic-big">' + t[1] + '</div><div class="pic-word">' + t[0] + '</div>',
+        answer:a[0], choices: all.map(x => x[0]),
+        html: v => { const f = all.find(x => x[0] === v); return '<span class="pa">' + f[1] + '</span><span class="pw">' + v + '</span>'; }, ansCls:" pic",
+        winParts:[], winTail: t[0] + " and " + a[0] + " rhyme", win: t[0] + " and " + a[0] + " rhyme!" };
+    }
+    const t = pickOne(LETTER_IDS), T = t.toUpperCase();
+    return { key:"tr"+t+c, trace:true, ch: fmt(t, c), q:"Trace the letter", speech:"Trace the letter " + T, parts:["traceit", "L_"+t],
+      winParts:["L_"+t, "s_"+t], win: T + " says " + SOUNDTXT[t] + "!" };
+  }
+
   function deck(act){
     const seen = new Set(), d = []; let g = 0;
     while(d.length < S.round && g++ < 300){ const c = makeCard(act); if(!seen.has(c.key) || g > 200){ seen.add(c.key); d.push(c); } }
@@ -415,29 +612,47 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     return h + '</div>';
   }
 
+  const LET_ACTS = [
+    {id:"abc", name:"ABC board", pic:"🔤", cls:"t1", wide:true},
+    {id:"findletter", name:"Find the letter", pic:"🔎", cls:"t2"},
+    {id:"sound", name:"Letter sounds", pic:"👂", cls:"t3"},
+    {id:"firstletter", name:"First letter", pic:"🐍", cls:"t4"},
+    {id:"readword", name:"Read a word", pic:"📖", cls:"t5"},
+    {id:"rhyme", name:"Rhymes", pic:"🎶", cls:"t6"},
+    {id:"trace", name:"Trace it", pic:"✏️", cls:"t1"}
+  ];
+  const tileHTML = a => '<button type="button" class="tile ' + a.cls + (a.wide ? " wide" : "") + '" id="act-' + a.id + '" data-act="' + a.id + '"><span class="pic">' + a.pic + '</span><span class="name">' + a.name + '</span></button>';
   function home(){
     S.screen = "home";
     app.innerHTML =
-      '<div class="bar"><span></span><button type="button" class="grown" id="grownBtn">Grown-ups ⚙︎</button></div>' +
+      '<div class="bar">' + musicBtnHTML() + '<button type="button" class="grown" id="grownBtn">Grown-ups ⚙︎</button></div>' +
       '<div class="hello"><h1>Count <span>&amp;</span> Flip</h1><p>Pick a game!</p></div>' +
-      '<div class="tiles">' + ACTS.map(a => '<button type="button" class="tile ' + a.cls + '" id="act-' + a.id + '" data-act="' + a.id + '"><span class="pic">' + a.pic + '</span><span class="name">' + a.name + '</span></button>').join("") + '</div>';
+      '<section class="section"><h2>🔢 Numbers</h2><div class="tiles">' + ACTS.map(tileHTML).join("") + '</div></section>' +
+      '<section class="section"><h2>🔤 Letters &amp; reading</h2><div class="tiles">' + LET_ACTS.map(tileHTML).join("") + '</div></section>';
     app.querySelectorAll(".tile").forEach(t => t.addEventListener("click", () => start(t.dataset.act)));
     document.getElementById("grownBtn").addEventListener("click", openPanel);
+    bindMusicBtn();
   }
 
   function start(act){
-    S.act = act; S.deck = deck(act); S.i = 0; S.stars = 0;
     tone(1,0,.01); // unlock audio on iPhone with this tap
+    musicArmed = true; applyMusic();
+    if(act === "abc") return abcBoard();
+    S.act = act; S.deck = deck(act); S.i = 0; S.stars = 0;
     play();
   }
 
   function play(){
     S.screen = "play"; S.busy = false; S.tries = 0;
     const c = S.deck[S.i];
+    if(c.trace) return playTrace(c);
     let body = c.body || "";
     if(c.listen){
-      body = soundOn() ? '<button type="button" class="listen-big" id="listenBtn" aria-label="Hear the number again">🔊</button>'
-                     : '<div class="word">' + words(c.n) + '</div>';
+      body = soundOn() ? '<button type="button" class="listen-big" id="listenBtn" aria-label="Hear it again">🔊</button>'
+                     : '<div class="word">' + (c.listenText || words(c.n)) + '</div>';
+    }
+    if(c.word){
+      body = '<div class="readword">' + c.word.split("").map((ch,k) => '<button type="button" class="lt" id="lt-' + k + '" data-ch="' + ch + '">' + ch + '</button>').join("") + '</div><p class="tap-tip">Tap a letter to hear it</p>';
     }
     let answers;
     if(c.groups){
@@ -445,18 +660,38 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
         '<button type="button" class="ans group c' + k + '" id="ans-' + k + '" data-v="' + k + '">' + (S.max > 20 ? blocks(g.n) : objs(g.e, g.n, g.n > 10 ? "clamp(1.4rem, 6.5vw, 1.9rem)" : "clamp(1.8rem, 8vw, 2.4rem)")) + '</button>').join("") + '</div>';
     } else {
       answers = '<div class="answers">' + c.choices.map((v,k) =>
-        '<button type="button" class="ans c' + k + '" id="ans-' + k + '" data-v="' + v + '">' + v + '</button>').join("") + '</div>';
+        '<button type="button" class="ans c' + k + (c.ansCls || "") + '" id="ans-' + k + '" data-v="' + v + '">' + (c.html ? c.html(v) : v) + '</button>').join("") + '</div>';
     }
     app.innerHTML =
-      '<div class="bar"><button type="button" class="round-btn" id="homeBtn" aria-label="Home">🏠</button>' + starsHTML() + '<span style="width:52px;flex:none"></span></div>' +
+      '<div class="bar"><button type="button" class="round-btn" id="homeBtn" aria-label="Home">🏠</button>' + starsHTML() + musicBtnHTML() + '</div>' +
       '<div class="card"><div class="q"><span>' + c.q + '</span>' + (soundOn() ? '<button type="button" class="speak" id="speakBtn" aria-label="Say it again">🔊</button>' : '') + '</div>' + body + '</div>' +
       answers +
       '<div class="cheer" id="cheer" aria-live="polite"></div>';
     document.getElementById("homeBtn").addEventListener("click", () => { stopVoice(); home(); });
-    const sp = document.getElementById("speakBtn"); if(sp) sp.addEventListener("click", () => speak(c.parts, c.speech));
-    const lb = document.getElementById("listenBtn"); if(lb) lb.addEventListener("click", () => speak(c.parts, c.speech));
+    bindMusicBtn();
+    const say = () => speak(c.parts, c.speech, c.tail);
+    const sp = document.getElementById("speakBtn"); if(sp) sp.addEventListener("click", say);
+    const lb = document.getElementById("listenBtn"); if(lb) lb.addEventListener("click", say);
+    app.querySelectorAll(".lt").forEach(b => b.addEventListener("click", () => {
+      const ch = b.dataset.ch; b.classList.add("hit"); setTimeout(() => b.classList.remove("hit"), 350);
+      speak(["s_" + ch], SOUNDTXT[ch] || ch);
+    }));
     app.querySelectorAll(".ans").forEach(b => b.addEventListener("click", () => answer(b)));
-    setTimeout(() => speak(c.parts, c.speech), 250);
+    setTimeout(say, 250);
+  }
+
+  function celebrate(c){
+    S.busy = true;
+    const cheer = document.getElementById("cheer");
+    const recorded = PRAISE.map((x,k) => k).filter(k => voiceBufs["p"+k]);
+    const pk = S.voice === "mine" && recorded.length ? pickOne(recorded) : rand(0, PRAISE.length - 1), p = PRAISE[pk];
+    cheer.className = "cheer"; cheer.textContent = p + " " + c.win;
+    chime(); confetti();
+    const wp = c.winParts || numParts(c.winNum);
+    setTimeout(() => speak(["p"+pk].concat(wp), p + " " + (c.winText || c.win), c.winTail), 350);
+    S.stars++;
+    const st = document.getElementById("st-" + (S.stars-1)); if(st) st.classList.add("on");
+    setTimeout(next, c.winTail || c.trace ? 2800 : 2000);
   }
 
   function answer(btn){
@@ -464,22 +699,15 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     const c = S.deck[S.i], cheer = document.getElementById("cheer");
     const ok = String(btn.dataset.v) === String(c.answer);
     if(ok){
-      S.busy = true;
       btn.classList.add("yay");
       app.querySelectorAll(".ans").forEach(b => { if(b !== btn) b.disabled = true; });
-      const recorded = PRAISE.map((x,k) => k).filter(k => voiceBufs["p"+k]);
-      const pk = S.voice === "mine" && recorded.length ? pickOne(recorded) : rand(0, PRAISE.length - 1), p = PRAISE[pk];
-      cheer.className = "cheer"; cheer.textContent = p + " " + c.win;
-      chime(); confetti();
-      setTimeout(() => speak(["p"+pk].concat(numParts(c.winNum)), p + " " + c.win), 350);
-      S.stars++;
-      const st = document.getElementById("st-" + (S.stars-1)); if(st) st.classList.add("on");
-      setTimeout(next, 2000);
+      celebrate(c);
     } else {
       S.tries++;
       btn.classList.add("nope"); btn.disabled = true;
       cheer.className = "cheer again"; cheer.textContent = "Oops! Try again.";
       boop(); setTimeout(() => speak(["oops"], "Oops! Try again."), 300);
+      if(c.help && S.tries >= 2 && soundOn()) setTimeout(() => { if(!S.busy && S.deck[S.i] === c) { stopVoice(); tts(c.helpText); } }, 1700);
     }
   }
 
@@ -501,6 +729,102 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     document.getElementById("homeBtn2").addEventListener("click", home);
   }
 
+  /* ---------- tracing and the ABC board ---------- */
+  function playTrace(c){
+    app.innerHTML =
+      '<div class="bar"><button type="button" class="round-btn" id="homeBtn" aria-label="Home">🏠</button>' + starsHTML() + musicBtnHTML() + '</div>' +
+      '<div class="card"><div class="q"><span>Trace the letter</span>' + (soundOn() ? '<button type="button" class="speak" id="speakBtn" aria-label="Say it again">🔊</button>' : '') + '</div>' +
+      '<div class="trace-box" id="tbox"><canvas id="tcv"></canvas></div>' +
+      '<div class="trace-row"><button type="button" class="small-btn" id="tclear">↺ Start again</button></div></div>' +
+      '<div class="cheer" id="cheer" aria-live="polite"></div>';
+    document.getElementById("homeBtn").addEventListener("click", () => { stopVoice(); home(); });
+    bindMusicBtn();
+    const say = () => speak(c.parts, c.speech);
+    const sp = document.getElementById("speakBtn"); if(sp) sp.addEventListener("click", say);
+    setTimeout(say, 250);
+
+    const box = document.getElementById("tbox"), cv = document.getElementById("tcv"), cheer = document.getElementById("cheer");
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const W = cv.width = cv.height = Math.round((box.clientWidth || 320) * dpr);
+    const g = cv.getContext("2d");
+    const guide = document.createElement("canvas"), ink = document.createElement("canvas");
+    guide.width = guide.height = ink.width = ink.height = W;
+    const gg = guide.getContext("2d"), ig = ink.getContext("2d");
+    const fontOf = px => '800 ' + px + 'px "Baloo 2", "Arial Rounded MT Bold", system-ui, sans-serif';
+
+    function drawGuide(){
+      gg.clearRect(0, 0, W, W);
+      gg.textAlign = "left"; gg.textBaseline = "alphabetic";
+      let size = W * 0.8; gg.font = fontOf(size);
+      let m = gg.measureText(c.ch), x0, y0;
+      if(m.actualBoundingBoxAscent != null){
+        const k = Math.min(W * 0.74 / (m.actualBoundingBoxAscent + m.actualBoundingBoxDescent), W * 0.74 / (m.actualBoundingBoxLeft + m.actualBoundingBoxRight), 1.25);
+        size *= k; gg.font = fontOf(size); m = gg.measureText(c.ch);
+        x0 = W/2 - (m.actualBoundingBoxRight - m.actualBoundingBoxLeft) / 2;
+        y0 = W/2 + (m.actualBoundingBoxAscent - m.actualBoundingBoxDescent) / 2;
+      } else { x0 = W/2 - m.width/2; y0 = W * 0.72; }
+      gg.fillStyle = "#d9d2ff"; gg.fillText(c.ch, x0, y0);
+      gg.strokeStyle = "#8f7bff"; gg.lineWidth = W * 0.008; gg.strokeText(c.ch, x0, y0);
+    }
+    function paint(){ g.clearRect(0, 0, W, W); g.drawImage(guide, 0, 0); g.drawImage(ink, 0, 0); }
+    function score(){
+      const N = 72, a = document.createElement("canvas"), b = document.createElement("canvas");
+      a.width = a.height = b.width = b.height = N;
+      const ax = a.getContext("2d"), bx = b.getContext("2d");
+      ax.drawImage(guide, 0, 0, N, N); bx.drawImage(ink, 0, 0, N, N);
+      const gd = ax.getImageData(0, 0, N, N).data, id = bx.getImageData(0, 0, N, N).data;
+      let gt = 0, gc = 0, it = 0, io = 0;
+      for(let p = 3; p < gd.length; p += 4){
+        const inG = gd[p] > 90, inI = id[p] > 90;
+        if(inG){ gt++; if(inI) gc++; }
+        if(inI){ it++; if(!inG) io++; }
+      }
+      return { cov: gt ? gc / gt : 0, out: it ? io / it : 1, ink: it };
+    }
+    let drawing = false, last = null;
+    const pt = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * W / r.width, (e.clientY - r.top) * W / r.height]; };
+    ig.lineCap = "round"; ig.lineJoin = "round"; ig.strokeStyle = "#6a54e0"; ig.lineWidth = W * 0.085;
+    cv.addEventListener("pointerdown", e => {
+      if(S.busy) return;
+      e.preventDefault(); drawing = true; try{ cv.setPointerCapture(e.pointerId); }catch(x){}
+      last = pt(e); ig.beginPath(); ig.moveTo(last[0], last[1]); ig.lineTo(last[0] + 0.01, last[1]); ig.stroke(); paint();
+    });
+    cv.addEventListener("pointermove", e => {
+      if(!drawing) return;
+      e.preventDefault(); const p = pt(e);
+      ig.beginPath(); ig.moveTo(last[0], last[1]); ig.lineTo(p[0], p[1]); ig.stroke(); last = p; paint();
+    });
+    const up = () => {
+      if(!drawing) return; drawing = false;
+      const s = score();
+      if(s.cov >= 0.7 && s.out <= 0.5){ cv.style.borderColor = "var(--grass-deep)"; celebrate(c); }
+      else if(s.ink > 40){ cheer.className = "cheer again"; cheer.textContent = s.out > 0.5 ? "Stay on the letter" : "Keep going!"; }
+    };
+    cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+    document.getElementById("tclear").addEventListener("click", () => {
+      if(S.busy) return; ig.clearRect(0, 0, W, W); cheer.textContent = ""; paint();
+    });
+    const init = () => { drawGuide(); paint(); };
+    init();
+    if(document.fonts && document.fonts.load) document.fonts.load('800 80px "Baloo 2"').then(() => { if(!S.busy && S.deck[S.i] === c){ init(); } }).catch(() => {});
+  }
+
+  function abcBoard(){
+    S.screen = "abc"; S.act = "abc";
+    app.innerHTML =
+      '<div class="bar"><button type="button" class="round-btn" id="homeBtn" aria-label="Home">🏠</button><span style="font-size:1.6rem;font-weight:800">ABC</span>' + musicBtnHTML() + '</div>' +
+      '<div class="card"><div class="abc-say" id="abcSay"><span class="bw">Tap a letter!</span></div></div>' +
+      '<div class="abc">' + LETTER_IDS.map(l => '<button type="button" id="ab-' + l + '" data-l="' + l + '"><span class="al">' + l.toUpperCase() + l + '</span><span class="ae">' + LET[l][1] + '</span></button>').join("") + '</div>';
+    document.getElementById("homeBtn").addEventListener("click", () => { stopVoice(); home(); });
+    bindMusicBtn();
+    app.querySelectorAll(".abc button").forEach(b => b.addEventListener("click", () => {
+      const l = b.dataset.l, L = l.toUpperCase(), w = LET[l][0], snd = SOUNDTXT[l];
+      app.querySelectorAll(".abc button.hit").forEach(x => x.classList.remove("hit")); b.classList.add("hit");
+      document.getElementById("abcSay").innerHTML = '<span class="bl">' + L + l + '</span><span class="bw">' + L + ' is for ' + w + ' ' + LET[l][1] + '<small>says "' + snd + '"</small></span>';
+      speak(["L_" + l, "s_" + l], L + ". " + snd + ". " + L + " is for " + w + ".", L + " is for " + w);
+    }));
+  }
+
   /* ---------- grown-ups panel ---------- */
   function openPanel(){
     const seg = (key, vals, label) => '<div class="row"><span class="lbl">' + label + '</span><div class="seg">' +
@@ -509,28 +833,32 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     sheet.className = "sheet"; sheet.id = "sheet";
     sheet.innerHTML = '<div class="panel" role="dialog" aria-label="Settings for grown-ups"><h3>Settings for grown-ups</h3>' +
       seg("max", [[5,"Up to 5"],[10,"Up to 10"],[20,"Up to 20"],[50,"Up to 50"],[100,"Up to 100"]], "Numbers") +
+      seg("letters", [["both","Aa both"],["caps","ABC"],["small","abc"]], "Letters") +
+      seg("words", [["short","Short (cat)"],["long","Longer (frog)"],["mixed","Mixed"]], "Reading words") +
       seg("round", [[5,"5 cards"],[10,"10 cards"]], "Game length") +
       seg("voice", [["mine","My voice"],["phone","Phone voice"],["off","Off"]], "Voice") +
+      seg("music", [[true,"Music on"],[false,"Music off"]], "Background music") +
       '<button type="button" class="big-btn rec-open" id="recOpen">🎙 Record my voice</button>' +
-      '<p class="note">Turn the iPhone\'s silent switch off to hear the voice. Above 20, numbers show as purple ten-sticks and yellow single blocks. Big adding games start from a number and add a few more.</p>' +
+      '<p class="note">Turn the iPhone\'s silent switch off to hear the voice and music. Above 20, numbers show as purple ten-sticks and yellow single blocks. Letter sounds need your recordings to sound right: the phone voice only guesses them.</p>' +
       '<button type="button" class="big-btn" id="closePanel">Done</button></div>';
     document.body.appendChild(sheet);
     sheet.addEventListener("click", e => { if(e.target === sheet) sheet.remove(); });
     sheet.querySelectorAll(".seg button").forEach(b => b.addEventListener("click", () => {
-      const k = b.dataset.k; let v = b.dataset.v;
-      S[k] = k === "voice" ? v : +v;
+      const k = b.dataset.k, v = b.dataset.v;
+      S[k] = (k === "voice" || k === "letters" || k === "words") ? v : k === "music" ? v === "true" : +v;
       saveSettings();
+      if(k === "music"){ musicArmed = true; applyMusic(); }
       sheet.querySelectorAll('.seg button[data-k="' + k + '"]').forEach(x => x.setAttribute("aria-pressed", x === b));
     }));
     document.getElementById("closePanel").addEventListener("click", () => sheet.remove());
     document.getElementById("recOpen").addEventListener("click", () => { sheet.remove(); recorder(); });
   }
-  function saveSettings(){ store.set("cf-kid", {max:S.max, voice:S.voice, round:S.round}); }
+  function saveSettings(){ store.set("cf-kid", {max:S.max, voice:S.voice, round:S.round, letters:S.letters, words:S.words, music:S.music}); }
 
   /* ---------- voice recorder ---------- */
   let micStream = null, mediaRec = null, recTimer = 0;
   function recorder(startAt){
-    S.screen = "rec";
+    S.screen = "rec"; musicStop();
     let idx = startAt != null ? startAt : Math.max(0, CLIPS.findIndex(c => !voiceBufs[c[0]]));
     let recording = false, confirmWipe = false;
     function draw(msg, cls){
@@ -539,7 +867,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
         '<div class="rec">' +
         '<div class="bar"><button type="button" class="small-btn" id="recBack">← Done</button><span style="font-weight:800">' + done + ' of ' + CLIPS.length + ' recorded</span></div>' +
         '<div class="card"><span class="say-lbl">Say this · ' + (idx+1) + ' of ' + CLIPS.length + '</span>' +
-          '<div class="say">' + c[1] + '</div>' +
+          '<div class="say"><span>' + c[1].replace(/  \((.*)\)$/, '<small>$1</small>') + '</span></div>' +
           '<div class="rec-row">' +
             '<button type="button" class="small-btn" id="recPrev"' + (idx === 0 ? " disabled" : "") + '>← Back</button>' +
             '<button type="button" class="mic' + (recording ? " on" : "") + '" id="micBtn" aria-label="' + (recording ? "Stop recording" : "Start recording") + '"><span></span></button>' +
@@ -549,7 +877,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
           '<button type="button" class="small-btn" id="recPlay"' + (has ? "" : " disabled") + '>▶ Listen</button>' +
         '</div>' +
         '<p class="note">Speak close to the phone in a quiet room. Recordings stay on this iPhone only. Anything you haven\'t recorded yet uses the phone voice.</p>' +
-        '<div class="chips">' + CLIPS.map((x,k) => '<button type="button" class="chip' + (voiceBufs[x[0]] ? " done" : "") + (k === idx ? " cur" : "") + '" data-k="' + k + '">' + x[1].split("  (")[0] + '</button>').join("") + '</div>' +
+        '<div class="chips">' + (() => { let h = "", lg = ""; CLIPS.forEach((x,k) => { const g = clipGroup(x[0]); if(g !== lg){ h += '<div class="grp">' + g + '</div>'; lg = g; } h += '<button type="button" class="chip' + (voiceBufs[x[0]] ? " done" : "") + (k === idx ? " cur" : "") + '" data-k="' + k + '">' + x[1].split("  (")[0] + '</button>'; }); return h; })() + '</div>' +
         '<button type="button" class="small-btn" id="recWipe" style="align-self:center">' + (confirmWipe ? "Tap again to delete all recordings" : "Delete all recordings") + '</button>' +
         '</div>';
       document.getElementById("recBack").addEventListener("click", leave);
@@ -605,7 +933,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     function leave(){
       stopRec(); stopVoice();
       if(micStream){ micStream.getTracks().forEach(t => t.stop()); micStream = null; }
-      home();
+      home(); applyMusic();
     }
     draw();
   }
@@ -615,6 +943,7 @@ canvas#fx{position:fixed; inset:0; width:100%; height:100%; pointer-events:none;
     if(/^[1-3]$/.test(e.key)){ const b = document.getElementById("ans-" + (+e.key-1)); if(b) b.click(); }
   });
 
+  document.addEventListener("visibilitychange", () => { if(document.hidden) musicStop(); else applyMusic(); });
   loadVoice();
   home();
 })();
